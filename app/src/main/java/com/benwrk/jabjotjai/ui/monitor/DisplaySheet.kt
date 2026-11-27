@@ -13,9 +13,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -23,6 +25,7 @@ import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.DisplaySettings
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.SweepSpeed
+import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import java.math.BigDecimal
 
 /**
@@ -88,6 +91,14 @@ fun DisplaySheet(
                         label = { Text(plainNumber(ScaleLadder.ACC.mmPerUnit(i))) },
                     )
                 }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.display_beep), style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.display_beep_hint), color = MonitorColors.Secondary, style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.beep, onCheckedChange = { beep -> onChange { it.copy(beep = beep) } })
             }
         }
     }

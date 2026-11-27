@@ -63,6 +63,7 @@ data class DisplaySettings(
     val ecgGainIndex: Int = ScaleLadder.ECG.standardIndex,
     val accAuto: Boolean = true,
     val accScaleIndex: Int = ScaleLadder.ACC.standardIndex,
+    val beep: Boolean = false,
 )
 
 /** Where a band's middle line sits, in sample units, and which step of its ladder it draws at. */

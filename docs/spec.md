@@ -18,7 +18,8 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
 1. **Connect to a Polar H10** that the user picks from a scan of nearby straps.
 2. **Show live, in the style of a bedside patient monitor:**
    - the ECG waveform;
-   - heart rate as a large numeric, as the strap reports it;
+   - heart rate as a large numeric, as the strap reports it, beside a heart that flashes at
+     each beat the strap reports;
    - the accelerometer as three raw traces, X, Y and Z, in one band on one shared scale and
      centre, so each axis keeps its true level, with nothing derived from them, requested at
      200 Hz and 8 G.
@@ -29,7 +30,10 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
      40 mm/g, each either fixed or automatic. Automatic is the default: it picks one of the same
      steps from the last few seconds of the trace, ignoring a second or two of outliers, and moves
      the band to keep the trace in its middle. The label always states the step in use, and the
-     1 mV calibration pulse follows the gain and the speed.
+     1 mV calibration pulse follows the gain and the speed;
+   - a beep at each beat the strap reports, off by default. It sounds only while the monitor is
+     on screen, follows the media volume, never interrupts other audio and never appears as media
+     playing (decision `0009`).
 
    A stretch of trace beyond the edge of its band is drawn on the edge and marked as clipped, so
    a peak the display cut off cannot pass for the shape of the wave.
@@ -48,6 +52,7 @@ Not scheduled. Each becomes a version when it is specified:
 
 - recording sessions, and getting files off the phone;
 - a viewer;
-- detectors, as derived overlays;
+- detectors, as derived overlays. The monitor's beat beep and heart flash then follow the R-peak
+  detector instead of the strap's reported beats (decision `0009`);
 - live sharing;
 - sync.

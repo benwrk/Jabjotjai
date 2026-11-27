@@ -19,6 +19,7 @@ class DisplaySettingsStore(context: Context) {
             ecgGainIndex = prefs.getInt(ECG_GAIN, defaults.ecgGainIndex).takeIf { it in 0 until ScaleLadder.ECG.size } ?: defaults.ecgGainIndex,
             accAuto = prefs.getBoolean(ACC_AUTO, defaults.accAuto),
             accScaleIndex = prefs.getInt(ACC_SCALE, defaults.accScaleIndex).takeIf { it in 0 until ScaleLadder.ACC.size } ?: defaults.accScaleIndex,
+            beep = prefs.getBoolean(BEEP, defaults.beep),
         )
     }
 
@@ -29,6 +30,7 @@ class DisplaySettingsStore(context: Context) {
             .putInt(ECG_GAIN, settings.ecgGainIndex)
             .putBoolean(ACC_AUTO, settings.accAuto)
             .putInt(ACC_SCALE, settings.accScaleIndex)
+            .putBoolean(BEEP, settings.beep)
             .apply()
     }
 
@@ -39,5 +41,6 @@ class DisplaySettingsStore(context: Context) {
         const val ECG_GAIN = "ecg_gain_index"
         const val ACC_AUTO = "acc_auto"
         const val ACC_SCALE = "acc_scale_index"
+        const val BEEP = "beep"
     }
 }

@@ -9,6 +9,7 @@ import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.HrRecord
 import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.raw.RawLine
+import com.benwrk.jabjotjai.raw.RawStreams
 
 /** One channel's samples, oldest first: sensor timestamps and values as the file holds them. */
 class TraceSnapshot(val tNs: LongArray, val values: IntArray) {
@@ -39,6 +40,8 @@ data class MonitorSnapshot(
     /** The last connection event seen: one of [RawEvents.CONNECTING], `CONNECTED`, `DISCONNECTED`. */
     val connection: String?,
     val gaps: Int,
+    /** When to signal the strap's recent beats, on the phone's monotonic clock, oldest first (see [BeatSchedule]). */
+    val beats: List<Long>,
     val unknownLines: Int,
     val malformedLines: Int,
     val ended: Boolean,
@@ -56,6 +59,7 @@ data class MonitorSnapshot(
             batteryPct = null,
             connection = null,
             gaps = 0,
+            beats = emptyList(),
             unknownLines = 0,
             malformedLines = 0,
             ended = false,
@@ -65,12 +69,14 @@ data class MonitorSnapshot(
 
 /**
  * Folds the lines of a raw file into what the monitor shows. It keeps only the last [keepNs] of
- * each waveform, by sensor time, and derives nothing from the samples.
+ * each waveform, by sensor time, and derives nothing from the samples. Beats are the strap's own,
+ * from its heart-rate records.
  *
  * Not thread-safe: one reader feeds it.
  */
 class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
 
+    private val beats = BeatSchedule()
     private val ecg = SampleSeries()
     private val accX = SampleSeries()
     private val accY = SampleSeries()
@@ -108,17 +114,28 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
                     accZ.append(record.tNs, record.zMg, keepNs)
                     record.tNs.lastOrNull()?.let { accTiming = FrameTiming(it, record.monoNs) }
                 }
-                is HrRecord -> heartRate = HeartRate(
-                    bpm = record.bpm,
-                    lastRrMs = record.rrMs.lastOrNull(),
-                    contact = record.contact.takeIf { record.contactSupported },
-                    receivedMonoNs = record.monoNs,
-                )
+                is HrRecord -> {
+                    heartRate = HeartRate(
+                        bpm = record.bpm,
+                        lastRrMs = record.rrMs.lastOrNull(),
+                        contact = record.contact.takeIf { record.contactSupported },
+                        receivedMonoNs = record.monoNs,
+                    )
+                    // The 1/1024 s values as sent, rather than the SDK's rounded milliseconds.
+                    if (record.rrAvailable) beats.accept(record.monoNs, record.rr1024.map { it * NS_PER_SECOND / 1024 })
+                }
                 is EventRecord -> when (record.event) {
-                    RawEvents.CONNECTING, RawEvents.CONNECTED, RawEvents.DISCONNECTED -> connection = record.event
+                    RawEvents.CONNECTING, RawEvents.CONNECTED -> connection = record.event
+                    RawEvents.DISCONNECTED -> {
+                        connection = record.event
+                        beats.restart()
+                    }
                     RawEvents.BATTERY -> batteryPct = record.levelPct
                 }
-                is GapRecord -> gaps++
+                is GapRecord -> {
+                    gaps++
+                    if (record.stream == RawStreams.HR) beats.restart()
+                }
                 is EndRecord -> ended = true
             }
         }
@@ -136,6 +153,7 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
         batteryPct = batteryPct,
         connection = connection,
         gaps = gaps,
+        beats = beats.recent().asList(),
         unknownLines = unknownLines,
         malformedLines = malformedLines,
         ended = ended,
@@ -144,8 +162,17 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
     companion object {
         /** Forty seconds: a sweep 250 mm wide, a large tablet's, at the slowest speed, 6.25 mm/s. */
         const val DEFAULT_KEEP_NS: Long = 40_000_000_000L
+
+        private const val NS_PER_SECOND = 1_000_000_000L
     }
 }
+
+/** A heart rate older than this is shown as no value rather than as a current reading. */
+const val HR_STALE_NS: Long = 5_000_000_000L
+
+/** The heart rate to show at [nowMonoNs]: the latest report, or null once it is [HR_STALE_NS] old. */
+fun MonitorSnapshot.currentHeartRate(nowMonoNs: Long): HeartRate? =
+    heartRate?.takeIf { nowMonoNs - it.receivedMonoNs < HR_STALE_NS }
 
 /** A growable window of samples, oldest first, trimmed by sensor time. */
 internal class SampleSeries(initialCapacity: Int = 1024) {
@@ -194,10 +221,3 @@ internal class SampleSeries(initialCapacity: Int = 1024) {
         end = count
     }
 }
-
-/** A heart rate older than this is shown as no value rather than as a current reading. */
-const val HR_STALE_NS: Long = 5_000_000_000L
-
-/** The heart rate to show at [nowMonoNs]: the latest report, or null once it is [HR_STALE_NS] old. */
-fun MonitorSnapshot.currentHeartRate(nowMonoNs: Long): HeartRate? =
-    heartRate?.takeIf { nowMonoNs - it.receivedMonoNs < HR_STALE_NS }

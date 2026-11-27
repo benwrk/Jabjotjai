@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -105,6 +106,8 @@ fun MonitorScreen(
     val accScale = rememberBandScale(snapshot, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, accBandMm) {
         listOf(it.accX, it.accY, it.accZ)
     }
+    var beepError by remember { mutableStateOf<String?>(null) }
+    BeatBeeps(snapshot, settings.value.beep, onUnavailable = { beepError = it })
     var showDisplaySheet by rememberSaveable { mutableStateOf(false) }
 
     // Every argument is a remembered state object, so one holder serves for as long as the scale holds.
@@ -124,10 +127,10 @@ fun MonitorScreen(
             if (landscape) {
                 Row(Modifier.fillMaxSize()) {
                     Waveforms(bands, Modifier.weight(1f).fillMaxHeight())
-                    Numerics(snapshot, secondsClock.value, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
+                    Numerics(snapshot, frameClock, secondsClock.value, beepError, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
                 }
             } else {
-                Numerics(snapshot, secondsClock.value, vertical = false, Modifier.fillMaxWidth())
+                Numerics(snapshot, frameClock, secondsClock.value, beepError, vertical = false, Modifier.fillMaxWidth())
                 Waveforms(bands, Modifier.weight(1f).fillMaxWidth())
             }
         }
@@ -305,38 +308,48 @@ private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
 }
 
 @Composable
-private fun Numerics(snapshot: State<MonitorSnapshot>, nowMonoNs: Long, vertical: Boolean, modifier: Modifier) {
+private fun Numerics(
+    snapshot: State<MonitorSnapshot>,
+    frameClock: State<Long>,
+    nowMonoNs: Long,
+    beepError: String?,
+    vertical: Boolean,
+    modifier: Modifier,
+) {
     val heartRate = snapshot.value.currentHeartRate(nowMonoNs)
     if (vertical) {
         Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            HeartRateNumeric(heartRate)
-            Details(heartRate, snapshot.value)
+            HeartRateNumeric(heartRate, snapshot, frameClock)
+            Details(heartRate, snapshot.value, beepError)
         }
     } else {
         Row(modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Bottom) {
-            HeartRateNumeric(heartRate)
-            Details(heartRate, snapshot.value)
+            HeartRateNumeric(heartRate, snapshot, frameClock)
+            Details(heartRate, snapshot.value, beepError)
         }
     }
 }
 
 @Composable
-private fun HeartRateNumeric(heartRate: HeartRate?) {
+private fun HeartRateNumeric(heartRate: HeartRate?, snapshot: State<MonitorSnapshot>, frameClock: State<Long>) {
     Column {
         Text(stringResource(R.string.monitor_hr), color = MonitorColors.Ecg, style = MaterialTheme.typography.titleMedium)
-        Text(
-            heartRate?.bpm?.toString() ?: stringResource(R.string.monitor_no_value),
-            color = MonitorColors.Ecg,
-            fontSize = 72.sp,
-            lineHeight = 72.sp,
-            fontWeight = FontWeight.Light,
-        )
+        Row {
+            Text(
+                heartRate?.bpm?.toString() ?: stringResource(R.string.monitor_no_value),
+                color = MonitorColors.Ecg,
+                fontSize = 72.sp,
+                lineHeight = 72.sp,
+                fontWeight = FontWeight.Light,
+            )
+            BeatHeart(snapshot, frameClock, Modifier.padding(start = 6.dp, top = 12.dp).size(24.dp))
+        }
         Text(stringResource(R.string.monitor_bpm), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelMedium)
     }
 }
 
 @Composable
-private fun Details(heartRate: HeartRate?, snapshot: MonitorSnapshot) {
+private fun Details(heartRate: HeartRate?, snapshot: MonitorSnapshot, beepError: String?) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             heartRate?.lastRrMs?.let { stringResource(R.string.monitor_rr, it) } ?: stringResource(R.string.monitor_rr_none),
@@ -349,6 +362,7 @@ private fun Details(heartRate: HeartRate?, snapshot: MonitorSnapshot) {
         }
         snapshot.batteryPct?.let { Text(stringResource(R.string.monitor_battery, it), color = MonitorColors.Secondary) }
         Text(stringResource(R.string.monitor_gaps, snapshot.gaps), color = if (snapshot.gaps > 0) MonitorColors.Warning else MonitorColors.Secondary)
+        beepError?.let { Text(stringResource(R.string.monitor_beep_unavailable, it), color = MonitorColors.Warning) }
     }
 }
 

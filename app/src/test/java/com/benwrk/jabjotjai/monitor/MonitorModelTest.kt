@@ -95,10 +95,56 @@ class MonitorModelTest {
         assertTrue(model.snapshot().ended)
     }
 
+    private fun hr(monoNs: Long, vararg rr1024: Int, rrAvailable: Boolean = true) = HrRecord(
+        wallMs = 0,
+        monoNs = monoNs,
+        bpm = 60,
+        rr1024 = rr1024.toList(),
+        // Rounded as the SDK rounds, so a beat placed from these would land on whole milliseconds.
+        rrMs = rr1024.map { Math.round(it * 1000.0 / 1024).toInt() },
+        rrAvailable = rrAvailable,
+        contact = true,
+        contactSupported = true,
+        correctedBpm = 0,
+        ppgQuality = 0,
+    )
+
+    @Test
+    fun beatsArePlacedFromTheIntervalsIn1024thsOfASecondAsSent() {
+        val model = MonitorModel()
+        model.feed(hr(5_000_000_000L, 1000, 1000))
+        // 1000/1024 s is 976.5625 ms; the rounded 977 ms would give 4_023_000_000.
+        assertEquals(listOf(4_023_437_500L, 5_000_000_000L), model.snapshot().beats)
+    }
+
+    @Test
+    fun noBeatsWhenTheStrapSaysItHasNoIntervals() {
+        val model = MonitorModel()
+        model.feed(hr(5_000_000_000L, 1024, rrAvailable = false))
+        assertEquals(emptyList<Long>(), model.snapshot().beats)
+    }
+
+    @Test
+    fun aDisconnectionOrAHeartRateGapRestartsTheBeatsButAnEcgGapDoesNot() {
+        // Continuing the sequence across the break gives 5, 6 and 7 s; restarting it gives 5 and 6.
+        val continued = listOf(5_000_000_000L, 6_000_000_000L, 7_000_000_000L)
+        val restarted = listOf(5_000_000_000L, 6_000_000_000L)
+        val breaks = listOf(
+            EventRecord(0, 5_500_000_000L, RawEvents.DISCONNECTED) to restarted,
+            GapRecord(RawStreams.HR, RawEvents.DISCONNECTED, fromMonoNs = 5_000_000_000L) to restarted,
+            GapRecord(RawStreams.ECG, RawEvents.STREAM_ERROR, fromMonoNs = 5_000_000_000L) to continued,
+        )
+        for ((brk, expected) in breaks) {
+            val model = MonitorModel()
+            model.feed(hr(5_000_000_000L, 1024), brk, hr(6_000_000_000L, 1024, 1024))
+            assertEquals("after $brk", expected, model.snapshot().beats)
+        }
+    }
+
     @Test
     fun aHeartRateIsShownForFiveSecondsAfterItArrives() {
         val model = MonitorModel()
-        model.feed(HrRecord(0, 9, bpm = 60, rr1024 = listOf(1024), rrMs = listOf(1000), rrAvailable = true, contact = true, contactSupported = true, correctedBpm = 0, ppgQuality = 0))
+        model.feed(hr(9, 1024))
         val snapshot = model.snapshot()
         assertEquals(60, snapshot.currentHeartRate(nowMonoNs = 9 + HR_STALE_NS - 1)?.bpm)
         assertNull(snapshot.currentHeartRate(nowMonoNs = 9 + HR_STALE_NS))
