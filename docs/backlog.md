@@ -24,16 +24,16 @@ if it carries "a valid proof-of-rotation" (developer.android.com/google/play/app
 updated to it without an uninstall (seen on the device, with the date), CI's secrets and expected
 certificate digest name the new key, and a decision records it.
 
-## Restart a stream that fails while the strap stays connected
+## See a failed stream start again on the strap
 
-`PolarH10Link.startStream` runs again only when the SDK reports a feature ready, which it does
-on connecting, so after a stream error the stream stays stopped until the next disconnection
-(traced 2026-11-28): one ECG error at night loses ECG for the rest of that connection while heart
-rate carries on. The same `catch` records a failure of the phone's own writing, an `IOException`
-from `RawWriter`, as the strap's stream failing. Done when a failed stream is restarted on the
-same connection, with a growing delay and each attempt recorded as an event, a write failure
-ends the capture through `fail` instead, and a test with a fake stream shows both. A stream that
-goes silent without an error is the entry "Record a stream that goes silent" below.
+A stream that fails, or ends, while the strap stays connected is now recorded and started again
+on the same connection after a growing pause (`keepStreaming`, tested with a fake stream). That
+the H10 streams again after such a restart has not been seen: no stream has failed on the test
+phone without a disconnection, and the SDK has switched a stream's notifications off after a
+restart before (see `PolarH10Link.startStream`). Done when a raw file shows a `stream_error`
+followed, on the same connection, by `stream_started` and that stream's frames, with the date;
+if the frames do not come, record what logcat shows. A stream that goes silent without an error
+is the entry "Record a stream that goes silent" below.
 
 ## Handle a full disk and a failed write
 

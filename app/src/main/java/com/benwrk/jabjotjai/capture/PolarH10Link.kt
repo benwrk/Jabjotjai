@@ -18,7 +18,6 @@ import com.polar.sdk.api.model.PolarHealthThermometerData
 import com.polar.sdk.api.model.PolarDeviceInfo
 import com.polar.sdk.api.model.PolarSensorSetting
 import com.polar.sdk.api.model.PolarSensorSetting.SettingType
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -173,24 +172,31 @@ class PolarH10Link(
      * ended switched on, heart rate arrived. Why cancelling a collection switches them off after
      * the new one switched them on is not confirmed. So a stream already running on this connection
      * is left alone; one left from an earlier connection is replaced.
+     *
+     * A stream that fails, or ends, while the strap stays connected is recorded and started again
+     * on the same connection (see [keepStreaming]), each try writing its `settings` and
+     * `stream_started` again. The collection that failed has ended by then rather than being
+     * cancelled, which is the case above; that the strap streams again after such a restart has
+     * not yet been seen.
      */
     private fun startStream(stream: String) {
         val running = streams[stream]
         if (running != null && running.connection == connection && running.job.isActive) return
         running?.job?.cancel()
-        streams[stream] = RunningStream(connection, scope.launch {
-            try {
-                when (stream) {
-                    RawStreams.ECG -> streamEcg()
-                    RawStreams.ACC -> streamAcc()
-                    RawStreams.HR -> streamHr()
-                }
-                if (!stopped) session.streamError(streamError(stream, "the stream ended without an error"))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                if (!stopped) session.streamError(streamError(stream, e.toString()))
-            }
+        val startedOn = connection
+        streams[stream] = RunningStream(startedOn, scope.launch {
+            keepStreaming(
+                attempt = {
+                    when (stream) {
+                        RawStreams.ECG -> streamEcg()
+                        RawStreams.ACC -> streamAcc()
+                        RawStreams.HR -> streamHr()
+                    }
+                },
+                onError = { message -> session.streamError(streamError(stream, message)) },
+                wanted = { !stopped && connection == startedOn },
+                nowMs = { clock.monoNs() / 1_000_000 },
+            )
         })
     }
 
@@ -206,7 +212,7 @@ class PolarH10Link(
             val samples = data.samples.map {
                 it as? EcgSample ?: throw IllegalStateException("unexpected ECG sample type ${it::class.simpleName}")
             }
-            session.frame(EcgRecord(stamp.wallMs, stamp.monoNs, samples.map { it.timeStamp }, samples.map { it.voltage }))
+            stored { session.frame(EcgRecord(stamp.wallMs, stamp.monoNs, samples.map { it.timeStamp }, samples.map { it.voltage })) }
         }
     }
 
@@ -217,52 +223,58 @@ class PolarH10Link(
         api.startAccStreaming(address, PolarSensorSetting(selected)).collect { data ->
             val stamp = clock.stamp()
             val samples = data.samples
-            session.frame(
-                AccRecord(
-                    wallMs = stamp.wallMs,
-                    monoNs = stamp.monoNs,
-                    tNs = samples.map { it.timeStamp },
-                    xMg = samples.map { it.x },
-                    yMg = samples.map { it.y },
-                    zMg = samples.map { it.z },
-                ),
-            )
-        }
-    }
-
-    private suspend fun streamHr() {
-        session.event(event(clock.stamp(), RawEvents.STREAM_STARTED).copy(stream = RawStreams.HR))
-        api.startHrStreaming(address).collect { data ->
-            val stamp = clock.stamp()
-            for (sample in data.samples) {
+            stored {
                 session.frame(
-                    HrRecord(
+                    AccRecord(
                         wallMs = stamp.wallMs,
                         monoNs = stamp.monoNs,
-                        bpm = sample.hr,
-                        rr1024 = sample.rrs,
-                        rrMs = sample.rrsMs,
-                        rrAvailable = sample.rrAvailable,
-                        contact = sample.contactStatus,
-                        contactSupported = sample.contactStatusSupported,
-                        correctedBpm = sample.correctedHr,
-                        ppgQuality = sample.ppgQuality,
+                        tNs = samples.map { it.timeStamp },
+                        xMg = samples.map { it.x },
+                        yMg = samples.map { it.y },
+                        zMg = samples.map { it.z },
                     ),
                 )
             }
         }
     }
 
+    private suspend fun streamHr() {
+        stored { session.event(event(clock.stamp(), RawEvents.STREAM_STARTED).copy(stream = RawStreams.HR)) }
+        api.startHrStreaming(address).collect { data ->
+            val stamp = clock.stamp()
+            for (sample in data.samples) {
+                stored {
+                    session.frame(
+                        HrRecord(
+                            wallMs = stamp.wallMs,
+                            monoNs = stamp.monoNs,
+                            bpm = sample.hr,
+                            rr1024 = sample.rrs,
+                            rrMs = sample.rrsMs,
+                            rrAvailable = sample.rrAvailable,
+                            contact = sample.contactStatus,
+                            contactSupported = sample.contactStatusSupported,
+                            correctedBpm = sample.correctedHr,
+                            ppgQuality = sample.ppgQuality,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     private fun recordSettings(stream: String, available: PolarSensorSetting, selected: Map<SettingType, Int>) {
         val stamp = clock.stamp()
-        session.event(
-            event(stamp, RawEvents.SETTINGS).copy(
-                stream = stream,
-                available = available.settings.entries.associate { (type, values) -> nameOf(type, stream) to values.sorted() },
-                selected = selected.entries.associate { (type, value) -> nameOf(type, stream) to value },
-            ),
-        )
-        session.event(event(stamp, RawEvents.STREAM_STARTED).copy(stream = stream))
+        stored {
+            session.event(
+                event(stamp, RawEvents.SETTINGS).copy(
+                    stream = stream,
+                    available = available.settings.entries.associate { (type, values) -> nameOf(type, stream) to values.sorted() },
+                    selected = selected.entries.associate { (type, value) -> nameOf(type, stream) to value },
+                ),
+            )
+            session.event(event(stamp, RawEvents.STREAM_STARTED).copy(stream = stream))
+        }
     }
 
     /** Setting names as `docs/raw-format.md` defines them. */
