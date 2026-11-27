@@ -14,6 +14,7 @@ import com.benwrk.jabjotjai.raw.UnreadableRawFileException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
@@ -145,7 +148,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
      * see [readMoment].
      */
     fun scrub(targetNs: Long) {
-        val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
+        val start = captureStartNs() ?: return
         val now = nowNs()
         if (beforeScrub == null) {
             val before = mutablePlayback.value
@@ -162,7 +165,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         val before = beforeScrub ?: mutablePlayback.value
         beforeScrub = null
         scrubTarget.value = null
-        val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
+        val start = captureStartNs() ?: return
         val now = nowNs()
         val base = if (before is Playback.Live) before else Playback.Past(targetNs, now, before.speed, before.paused)
         mutablePlayback.value = base.seek(targetNs, start, now)
@@ -171,7 +174,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
     /** Moves the playhead [byNs] from where it is, back if negative; see [Playback.jump]. */
     fun jump(byNs: Long) {
-        val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
+        val start = captureStartNs() ?: return
         val before = mutablePlayback.value
         mutablePlayback.value = before.jump(byNs, start, nowNs())
         if (before is Playback.Live) leaveLive() else replayStart.value++
@@ -222,10 +225,11 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
      */
     private suspend fun replay(file: File) {
         val sweeps = sweepsKept.first()
-        val (model, start) = modelFrom(mutablePlayback.value.positionNs(nowNs()) - REPLAY_LEAD_NS * sweeps, sweeps) ?: return
+        val from = readFrom(file, mutablePlayback.value.positionNs(nowNs()) - REPLAY_LEAD_NS * sweeps, sweeps) ?: return
+        val model = from.model
         // Nothing is published until the read reaches the playhead: the screen keeps what it shows.
         reportingReadErrors {
-            RawTail(file).linesWithOffsets(start).collect { (_, line) ->
+            linesFrom(from).collect { line ->
                 val time = (line as? RawLine.Record)?.record?.timeMonoNs()
                 if (time != null && time > mutablePlayback.value.positionNs(nowNs())) {
                     mutableReplay.value = model.snapshot()
@@ -244,14 +248,14 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
      */
     private suspend fun readMoment(file: File, targetNs: Long) {
         val sweeps = sweepsKept.first()
-        val (model, start) = modelFrom(targetNs - SCRUB_LEAD_NS * sweeps, sweeps) ?: return
+        val from = readFrom(file, targetNs - SCRUB_LEAD_NS * sweeps, sweeps) ?: return
         reportingReadErrors {
-            RawTail(file).linesWithOffsets(start)
-                .takeWhile { (_, line) -> ((line as? RawLine.Record)?.record?.timeMonoNs() ?: Long.MIN_VALUE) <= targetNs }
-                .collect { (_, line) -> model.accept(line) }
+            linesFrom(from)
+                .takeWhile { line -> ((line as? RawLine.Record)?.record?.timeMonoNs() ?: Long.MIN_VALUE) <= targetNs }
+                .collect { line -> from.model.accept(line) }
             // A drag that ended while this read ran has already set where the playhead goes.
             if (beforeScrub == null) return@reportingReadErrors
-            mutableReplay.value = model.snapshot()
+            mutableReplay.value = from.model.snapshot()
             mutableReplayReady.value = true
             val now = nowNs()
             mutablePlayback.value = Playback.Past(targetNs, now, mutablePlayback.value.speed, paused = true)
@@ -259,18 +263,62 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * A model for reading from [fromNs]: it starts at the last mark the capture's reader noted at
-     * or before then, with the state as it stood there, and the place in the file to read from.
+     * A file of the capture, for the past reader: an earlier file of a resumed capture as mapped when
+     * its history was read (see [EarlierFile]), or the running file, which is still growing.
      */
-    private fun modelFrom(fromNs: Long, sweeps: Int): Pair<MonitorModel, RawTail.Start>? {
+    private class Segment(val file: File, val shiftNs: Long, val startNs: Long, val timeline: CaptureTimeline, val running: Boolean)
+
+    /** The capture's files, oldest first: the earlier ones, once read (0.6), then [file], the running one. */
+    private fun segments(file: File): List<Segment>? {
         val live = Capture.live.value
-        val timeline = live.timeline ?: return null
         val header = live.snapshot.header ?: return null
-        val mark = timeline.markAtOrBefore(fromNs)
+        val timeline = live.timeline ?: return null
+        val earlier = (Capture.earlierTrends.value as? EarlierTrends.Read)?.takeIf { it.session == header.session }?.files.orEmpty()
+        return earlier.map { Segment(it.file, it.shiftNs, it.startNs, it.timeline, running = false) } +
+            Segment(file, shiftNs = 0, header.start.monoNs, timeline, running = true)
+    }
+
+    /** Where a read starts: the file holding the moment, the place in it, and a model as things stood there. */
+    private class ReadStart(val model: MonitorModel, val segments: List<Segment>, val index: Int, val start: RawTail.Start)
+
+    /**
+     * Where to read from to have [fromNs] onwards: the last mark noted at or before it in the file
+     * that holds it, with the state as it stood there. A moment between two files reads from the
+     * end of the earlier one.
+     */
+    private fun readFrom(file: File, fromNs: Long, sweeps: Int): ReadStart? {
+        val segments = segments(file) ?: return null
+        val index = segments.indexOfLast { it.startNs <= fromNs }.coerceAtLeast(0)
+        val segment = segments[index]
+        val mark = segment.timeline.markAtOrBefore(fromNs)
         val model = MonitorModel(MonitorModel.DEFAULT_KEEP_NS * sweeps)
-        model.setHeader(header)
-        model.startFrom(if (mark == null) CaptureStateAt.INITIAL else timeline.stateAt(mark.monoNs - 1))
-        return model to (if (mark == null) RawTail.Start.Beginning else RawTail.Start.At(mark.offset))
+        Capture.live.value.snapshot.header?.let(model::setHeader)
+        model.startFrom(if (mark == null) CaptureStateAt.INITIAL else segment.timeline.stateAt(mark.monoNs - 1))
+        return ReadStart(model, segments, index, if (mark == null) RawTail.Start.Beginning else RawTail.Start.At(mark.offset))
+    }
+
+    /**
+     * The capture's lines from [from]: through each earlier file to its end and on into the next,
+     * the time between files passing with no lines, so it shows as a gap and is never joined; then
+     * the running file, which never ends.
+     */
+    private fun linesFrom(from: ReadStart): Flow<RawLine> = flow {
+        for (i in from.index until from.segments.size) {
+            val segment = from.segments[i]
+            val start = if (i == from.index) from.start else RawTail.Start.Beginning
+            if (segment.running) {
+                RawTail(segment.file).linesWithOffsets(start).collect { (_, line) -> emit(line) }
+            } else {
+                for (line in earlierLines(segment.file, (start as? RawTail.Start.At)?.offset ?: 0L, segment.shiftNs)) emit(line)
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /** The start of the whole capture: its first earlier file's, once read (0.6), or the running file's. */
+    private fun captureStartNs(): Long? {
+        val header = Capture.live.value.snapshot.header ?: return null
+        val earlier = (Capture.earlierTrends.value as? EarlierTrends.Read)?.takeIf { it.session == header.session }
+        return earlier?.files?.firstOrNull()?.startNs ?: header.start.monoNs
     }
 
     private suspend fun reportingReadErrors(read: suspend () -> Unit) {

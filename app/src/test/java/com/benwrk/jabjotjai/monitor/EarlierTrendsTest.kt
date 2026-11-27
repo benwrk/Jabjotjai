@@ -142,4 +142,23 @@ class EarlierTrendsTest {
         assertEquals(42L, monoNsOf("{\"type\":\"ecg\",\"wall_ms\":1,\"mono_ns\":42,\"t_ns\":[]}"))
         assertNull(monoNsOf("{\"type\":\"gap\",\"from_mono_ns\":5}"))
     }
+
+    @Test
+    fun aRecordIsMovedOnlyOnThePhonesClockAndNotCopiedWhenThereIsNothingToMove() {
+        val record = hr(101 * s, 61)
+        assertTrue(record.shiftedBy(0) === record)
+        assertEquals(record.copy(monoNs = 91 * s), record.shiftedBy(-10 * s))
+        val ecg = EcgRecord(0, 102 * s, listOf(7), listOf(5))
+        // The strap's own sample times stay as it sent them.
+        assertEquals(EcgRecord(0, 92 * s, listOf(7), listOf(5)), ecg.shiftedBy(-10 * s))
+    }
+
+    @Test
+    fun anEarlierFileIsReadFromAPlaceInItWithItsTimesMoved() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        val file = write(a, hr(101 * s, 61), hr(103 * s, 63))
+        val offsetOfSecond = file.readLines().take(2).sumOf { it.length + 1 }.toLong()
+        val lines = earlierLines(file, offsetOfSecond, shiftNs = -100 * s).toList()
+        assertEquals(listOf(hr(3 * s, 63)), lines.map { (it as RawLine.Record).record })
+    }
 }

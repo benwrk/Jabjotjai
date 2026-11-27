@@ -146,6 +146,8 @@ fun MonitorScreen(
     val earlierTrends = Capture.earlierTrends.collectAsState()
     val session = running.file.nameWithoutExtension
     val earlier = remember(session) { derivedStateOf { earlierTrends.value.takeIf { it.session == session } ?: EarlierTrends.None } }
+    // The whole resumed capture's start, once its earlier files are read; until then, this file's.
+    val captureStartNs = (earlier.value as? EarlierTrends.Read)?.files?.firstOrNull()?.startNs ?: live.value.snapshot.header?.start?.monoNs
     val bands = remember(pxPerMm, session) { Bands(waves, trends, earlier, displayClock, pxPerMm, settings, scales, bandMm) }
     val playheadAtSecond = playback.value.positionNs(secondsClock.value)
     BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background)) {
@@ -172,9 +174,9 @@ fun MonitorScreen(
             Waveforms(bands, Modifier.weight(1f).fillMaxWidth())
             PlaybackBar(
                 playback = playback.value,
-                startNs = live.value.snapshot.header?.start?.monoNs,
+                startNs = captureStartNs,
                 nowNs = secondsClock.value,
-                sessionSeconds = live.value.snapshot.elapsedSeconds(secondsClock.value),
+                sessionSeconds = captureStartNs?.let { ((secondsClock.value - it) / 1_000_000_000L).coerceAtLeast(0) },
                 settings = settings.value,
                 onSettings = viewModel::updateDisplaySettings,
                 onOpenSettings = { showDisplaySheet = true },

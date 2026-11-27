@@ -1,11 +1,16 @@
 package com.benwrk.jabjotjai.monitor
 
+import com.benwrk.jabjotjai.raw.AccRecord
+import com.benwrk.jabjotjai.raw.EcgRecord
+import com.benwrk.jabjotjai.raw.EndRecord
 import com.benwrk.jabjotjai.raw.EventRecord
 import com.benwrk.jabjotjai.raw.GapRecord
 import com.benwrk.jabjotjai.raw.HeaderRecord
+import com.benwrk.jabjotjai.raw.HrRecord
 import com.benwrk.jabjotjai.raw.RawDecoders
 import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.raw.RawLine
+import com.benwrk.jabjotjai.raw.RawRecord
 import com.benwrk.jabjotjai.raw.RawTail
 import java.io.File
 import kotlin.math.abs
@@ -209,4 +214,40 @@ sealed interface EarlierTrends {
         val unreadable: Int,
         val files: List<EarlierFile> = emptyList(),
     ) : EarlierTrends
+}
+
+/**
+ * [this] with its times on the phone's monotonic clock moved by [ns], placing a record of an
+ * earlier file on the current file's clock (see [clockShiftNs]); the strap's own sample times stay
+ * as it sent them. Nothing is copied when there is nothing to move, which is the usual case.
+ */
+internal fun RawRecord.shiftedBy(ns: Long): RawRecord = if (ns == 0L) this else when (this) {
+    is HeaderRecord -> copy(start = start.copy(monoNs = start.monoNs + ns))
+    is EventRecord -> copy(monoNs = monoNs + ns)
+    is EcgRecord -> copy(monoNs = monoNs + ns)
+    is AccRecord -> copy(monoNs = monoNs + ns)
+    is HrRecord -> copy(monoNs = monoNs + ns)
+    is GapRecord -> copy(fromMonoNs = fromMonoNs + ns, toMonoNs = toMonoNs?.plus(ns))
+    is EndRecord -> copy(monoNs = monoNs + ns)
+}
+
+/**
+ * The lines of an earlier, finished file from [offset], a line start such as a timeline mark,
+ * decoded as its header says and with their times moved by [shiftNs]; it ends with the file.
+ */
+internal fun earlierLines(file: File, offset: Long, shiftNs: Long): Sequence<RawLine> = sequence {
+    val headerLine = file.bufferedReader().use { it.readLine() } ?: return@sequence
+    val decode = RawDecoders.forHeaderLine(headerLine, file)
+    file.inputStream().use { input ->
+        var skipped = 0L
+        while (skipped < offset) {
+            val step = input.skip(offset - skipped)
+            if (step <= 0) return@sequence
+            skipped += step
+        }
+        for (line in input.bufferedReader().lineSequence()) {
+            val decoded = decode(line)
+            yield(if (decoded is RawLine.Record) RawLine.Record(decoded.record.shiftedBy(shiftNs)) else decoded)
+        }
+    }
 }
