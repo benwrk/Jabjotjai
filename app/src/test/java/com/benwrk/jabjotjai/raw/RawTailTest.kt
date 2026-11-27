@@ -12,6 +12,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -20,7 +21,10 @@ import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 
-/** These run against real files and real time, with a short poll interval. */
+/**
+ * These run against real files and real time, with a short poll interval. Every file starts with
+ * a header, as every file the writer produces does.
+ */
 class RawTailTest {
 
     @get:Rule
@@ -38,11 +42,19 @@ class RawTailTest {
         return received to job
     }
 
+    private suspend fun failureOf(tail: RawTail): Throwable? {
+        var failure: Throwable? = null
+        withTimeout(timeoutMs) { tail.lines().catch { failure = it }.collect {} }
+        return failure
+    }
+
     @Test
-    fun emitsRecordsAppendedAfterItStarted() = runBlocking {
+    fun waitsForTheHeaderOfANewFileThenEmitsWhatIsAppended() = runBlocking {
         val file = newFile()
         RawWriter.create(file, monoNs = { 0L }).use { writer ->
+            // The file exists but is empty: the tail has to wait for the header.
             val (received, job) = follow(RawTail(file, pollIntervalMs = 5))
+            delay(50)
             writer.write(Samples.header)
             assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs) { received.receive() })
             writer.write(Samples.ecg)
@@ -53,9 +65,10 @@ class RawTailTest {
 
     @Test
     fun holdsATornLineBackUntilItsNewlineArrives() = runBlocking {
-        val file = newFile().apply { writeText("") }
+        val file = newFile().apply { writeText(line(Samples.header)) }
         val text = line(Samples.ecg)
         val (received, job) = follow(RawTail(file, pollIntervalMs = 5))
+        assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs) { received.receive() })
 
         file.appendText(text.substring(0, 25))
         delay(150)
@@ -95,11 +108,44 @@ class RawTailTest {
 
     @Test
     fun reportsAMalformedLineInsteadOfSkippingIt() = runBlocking {
-        val file = newFile().apply { writeText("not json\n" + line(Samples.end)) }
+        val file = newFile().apply { writeText(line(Samples.header) + "not json\n" + line(Samples.end)) }
         val lines = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).lines().toList() }
-        assertEquals(2, lines.size)
-        assertTrue(lines[0] is RawLine.Malformed)
-        assertEquals(RawLine.Record(Samples.end), lines[1])
+        assertEquals(3, lines.size)
+        assertTrue(lines[1] is RawLine.Malformed)
+        assertEquals(RawLine.Record(Samples.end), lines[2])
+    }
+
+    @Test
+    fun readsANewerMinorSkippingWhatItDoesNotKnow() = runBlocking {
+        val newerHeader = RawCodec.encode(Samples.header.copy(schema = "1.7"))
+            .replace("\"sensor_epoch\"", "\"added_in_1_7\":true,\"sensor_epoch\"")
+        val file = newFile().apply {
+            writeText(newerHeader + "\n" + """{"type":"annotation","text":"x"}""" + "\n" + line(Samples.hr) + line(Samples.end))
+        }
+        val lines = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).lines().toList() }
+        assertEquals(
+            listOf(
+                RawLine.Record(Samples.header.copy(schema = "1.7")),
+                RawLine.Unknown("annotation"),
+                RawLine.Record(Samples.hr),
+                RawLine.Record(Samples.end),
+            ),
+            lines,
+        )
+    }
+
+    @Test
+    fun refusesAFileWhoseSchemaMajorItCannotRead() = runBlocking {
+        val file = newFile().apply { writeText(line(Samples.header.copy(schema = "2.0")) + line(Samples.end)) }
+        val failure = failureOf(RawTail(file, pollIntervalMs = 5))
+        assertTrue("expected UnreadableRawFileException, got $failure", failure is UnreadableRawFileException)
+    }
+
+    @Test
+    fun refusesAFileThatDoesNotStartWithAHeader() = runBlocking {
+        val file = newFile().apply { writeText(line(Samples.ecg) + line(Samples.end)) }
+        val failure = failureOf(RawTail(file, pollIntervalMs = 5))
+        assertTrue("expected UnreadableRawFileException, got $failure", failure is UnreadableRawFileException)
     }
 
     @Test
@@ -115,15 +161,22 @@ class RawTailTest {
         // Wait until the header has been read, so the shrink happens behind the read position.
         assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs) { received.receive() })
         RandomAccessFile(file, "rw").use { it.setLength(0) }
-        assertTrue(withTimeout(timeoutMs) { failure.receive() } is IOException)
+        val thrown = withTimeout(timeoutMs) { failure.receive() }
+        assertTrue(thrown is IOException && thrown !is UnreadableRawFileException)
         job.cancel()
     }
 
     @Test
-    fun readFirstLineReturnsTheHeaderOrNullWhileItIsIncomplete() {
+    fun readHeaderReturnsTheHeaderOrNullWhileItIsIncomplete() {
         val file = newFile().apply { writeText(RawCodec.encode(Samples.header).substring(0, 10)) }
-        assertNull(RawTail.readFirstLine(file))
+        assertNull(RawTail.readHeader(file))
         file.writeText(line(Samples.header) + line(Samples.ecg))
-        assertEquals(RawLine.Record(Samples.header), RawTail.readFirstLine(file))
+        assertEquals(Samples.header, RawTail.readHeader(file))
+    }
+
+    @Test
+    fun readHeaderRefusesAnUnknownMajor() {
+        val file = newFile().apply { writeText(line(Samples.header.copy(schema = "2.0"))) }
+        assertThrows(UnreadableRawFileException::class.java) { RawTail.readHeader(file) }
     }
 }

@@ -17,5 +17,9 @@ edited to change its meaning.
 **A reader keeps every major version it has ever read.** Dropping one strands the files written in
 it.
 
+**Never migrate a file on disk.** When a new major arrives, the old major's decoder in
+`RawDecoders.forSchema` upgrades its records into the new model as they are read, with tests that
+feed it real lines of the old schema (decision `0006`).
+
 **`RawCodecTest` pins the exact text of every record type.** Update it on purpose when the schema
 changes. If it fails after a change that was not meant to touch the format, the format drifted.

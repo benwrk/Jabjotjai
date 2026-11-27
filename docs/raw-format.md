@@ -21,6 +21,10 @@ previous version would misread: a field renamed, removed, or given a different m
 
 **A reader** accepts any file whose major version it knows, whatever the minor; skips fields and
 record types it does not know; and reports a malformed line as malformed rather than dropping it.
+It reads the header's `schema` before anything else and refuses a major it does not know.
+
+**Files are never migrated.** A file keeps the schema it was written in for good. A reader for a
+newer major upgrades an older file's records as it reads them (decision `0006`).
 
 **Integers are exact 64-bit values.** Sensor timestamps are about 8.5 × 10^17, above 2^53, so a
 parser that turns every number into a double rounds them to a multiple of 128 ns. JavaScript's

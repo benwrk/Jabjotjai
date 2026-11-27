@@ -33,13 +33,17 @@ class RawTail(
     }
 
     /**
-     * Emits each complete line from [from] onwards, decoded, and keeps waiting for more until an
-     * [EndRecord] has been emitted. A line whose newline has not arrived yet is held back until it
-     * does, which also leaves a crash's torn last line alone. The file must already exist.
+     * Waits for the file's header, chooses a decoder from the schema it declares, then emits each
+     * complete line from [from] onwards and keeps waiting for more until an [EndRecord] has been
+     * emitted. A line whose newline has not arrived yet is held back until it does, which also
+     * leaves a crash's torn last line alone. The file must already exist.
      *
+     * @throws UnreadableRawFileException if the file does not start with a header, or its schema
+     *   major is one this build cannot read
      * @throws IOException if the file gets shorter, which an append-only file never does
      */
     fun lines(from: Start = Start.Beginning): Flow<RawLine> = flow {
+        val decode = RawDecoders.forHeaderLine(awaitFirstLine(), file)
         RandomAccessFile(file, "r").use { raf ->
             var position = when (from) {
                 Start.Beginning -> 0L
@@ -71,7 +75,7 @@ class RawTail(
                     } else if (byte != NEWLINE) {
                         pending.write(byte.toInt())
                     } else {
-                        val line = RawCodec.decode(String(pending.toByteArray(), Charsets.UTF_8))
+                        val line = decode(String(pending.toByteArray(), Charsets.UTF_8))
                         pending.reset()
                         emit(line)
                         if (line is RawLine.Record && line.record is EndRecord) return@flow
@@ -80,6 +84,14 @@ class RawTail(
             }
         }
     }.flowOn(dispatcher)
+
+    /** The file's first line, once it is complete. A new file is empty until its header lands. */
+    private suspend fun awaitFirstLine(): String {
+        while (true) {
+            firstLineText(file)?.let { return it }
+            delay(pollIntervalMs)
+        }
+    }
 
     private fun RandomAccessFile.byteAt(offset: Long): Byte {
         seek(offset)
@@ -92,10 +104,20 @@ class RawTail(
         private const val NEWLINE = '\n'.code.toByte()
 
         /**
-         * The first line of [file], decoded, or null if the file has no complete line yet. Every
-         * raw file starts with its [HeaderRecord].
+         * The header of [file], decoded with the decoder its own schema calls for, or null if the
+         * file has no complete line yet.
+         *
+         * @throws UnreadableRawFileException if the first line is not a header this build can read
          */
-        fun readFirstLine(file: File): RawLine? {
+        fun readHeader(file: File): HeaderRecord? {
+            val text = firstLineText(file) ?: return null
+            val line = RawDecoders.forHeaderLine(text, file)(text)
+            return ((line as? RawLine.Record)?.record as? HeaderRecord)
+                ?: throw UnreadableRawFileException("the first line of $file does not decode as a header: $line")
+        }
+
+        /** The first line of [file] without its newline, or null if no line is complete yet. */
+        private fun firstLineText(file: File): String? {
             val bytes = file.inputStream().use { input ->
                 val firstLine = ByteArrayOutputStream()
                 while (true) {
@@ -106,7 +128,7 @@ class RawTail(
                 }
                 firstLine.toByteArray()
             }
-            return RawCodec.decode(String(bytes, Charsets.UTF_8))
+            return String(bytes, Charsets.UTF_8)
         }
     }
 }
