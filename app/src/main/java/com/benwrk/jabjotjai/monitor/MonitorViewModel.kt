@@ -2,6 +2,7 @@ package com.benwrk.jabjotjai.monitor
 
 import android.app.Application
 import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.benwrk.jabjotjai.capture.Capture
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -31,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Feeds the monitor screen from the raw file of the running capture. It never receives data from
@@ -123,7 +126,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
                 val current = mutablePlayback.value
                 val next = current.caughtUp(nowNs())
                 if (next != current) goLive()
-                delay(CATCH_UP_CHECK_MS)
+                delay(CATCH_UP_CHECK_MS.milliseconds)
             }
         }
         viewModelScope.launch {
@@ -167,7 +170,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         scrubTarget.value = null
         val start = captureStartNs() ?: return
         val now = nowNs()
-        val base = if (before is Playback.Live) before else Playback.Past(targetNs, now, before.speed, before.paused)
+        val base = before as? Playback.Live ?: Playback.Past(targetNs, now, before.speed, before.paused)
         mutablePlayback.value = base.seek(targetNs, start, now)
         replayStart.value++
     }
@@ -300,7 +303,9 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     /**
      * The capture's lines from [from]: through each earlier file to its end and on into the next,
      * the time between files passing with no lines, so it shows as a gap and is never joined; then
-     * the running file, which never ends.
+     * the running file, which never ends. An earlier file that cannot be read, or stops being
+     * readable, is left where it stops and reading goes on into the next: the time it would have
+     * filled shows as a gap, and its trend rows count it as not read (see [readEarlierTrends]).
      */
     private fun linesFrom(from: ReadStart): Flow<RawLine> = flow {
         for (i in from.index until from.segments.size) {
@@ -309,7 +314,9 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
             if (segment.running) {
                 RawTail(segment.file).linesWithOffsets(start).collect { (_, line) -> emit(line) }
             } else {
-                for (line in earlierLines(segment.file, (start as? RawTail.Start.At)?.offset ?: 0L, segment.shiftNs)) emit(line)
+                earlierLines(segment.file, (start as? RawTail.Start.At)?.offset ?: 0L, segment.shiftNs)
+                    .catch { e -> if (e is IOException) Log.w(TAG, "passing over ${segment.file.name}, which cannot be read", e) else throw e }
+                    .collect { emit(it) }
             }
         }
     }.flowOn(Dispatchers.IO)
@@ -340,20 +347,22 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
             val position = playback.positionNs(nowNs())
             if (playback is Playback.Live || position >= timeNs) return
             val waitMs = if (playback.paused) MAX_WAIT_MS else ((timeNs - position) / playback.speed / 1e6).toLong()
-            delay(waitMs.coerceIn(1, MAX_WAIT_MS))
+            delay(waitMs.coerceIn(1, MAX_WAIT_MS).milliseconds)
         }
     }
 
     private suspend fun awaitHeader(file: File): HeaderRecord {
         while (true) {
             withContext(Dispatchers.IO) { RawTail.readHeader(file) }?.let { return it }
-            delay(HEADER_POLL_MS)
+            delay(HEADER_POLL_MS.milliseconds)
         }
     }
 
     private fun nowNs(): Long = SystemClock.elapsedRealtimeNanos()
 
     private companion object {
+        const val TAG = "MonitorViewModel"
+
         /** About 20 seconds of data at the rates 0.1 records: enough to fill a sweep at once. */
         const val TAIL_START_BYTES = 256L * 1024
         const val HEADER_POLL_MS = 20L

@@ -12,6 +12,8 @@ import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.raw.RawRecord
 import com.benwrk.jabjotjai.raw.Sensor
 import com.benwrk.jabjotjai.raw.Stamp
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -81,9 +83,22 @@ class EarlierTrendsTest {
     }
 
     @Test
-    fun aMissingEarlierFileEndsTheChain() {
+    fun aMissingEarlierFileBreaksTheChainAndIsCountedAsNotRead() {
         val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "gone")
-        assertEquals(emptyList<Pair<File, HeaderRecord>>(), earlierCaptures(folder.root, b))
+        assertEquals(EarlierChain(files = emptyList(), brokenAt = "gone"), earlierCaptures(folder.root, b))
+        // Counted, so the trend rows say a recording could not be read rather than showing a
+        // capture that continues nothing.
+        val read = readEarlierTrends(MonitorModel(), folder.root, b)
+        assertEquals(EarlierTrendsRead(files = 1, bytes = 1, unreadable = 1, finished = true), read)
+    }
+
+    @Test
+    fun anEarlierFileWhoseHeaderCannotBeReadBreaksTheChainThere() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        write(a, hr(101 * s, 61))
+        File(folder.root, "b.jsonl").writeText("not a header\n")
+        val c = header("c", wallMs = 1_020_000, monoNs = 120 * s, continues = "b")
+        assertEquals(EarlierChain(files = emptyList(), brokenAt = "b"), earlierCaptures(folder.root, c))
     }
 
     @Test
@@ -158,7 +173,38 @@ class EarlierTrendsTest {
         val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
         val file = write(a, hr(101 * s, 61), hr(103 * s, 63))
         val offsetOfSecond = file.readLines().take(2).sumOf { it.length + 1 }.toLong()
-        val lines = earlierLines(file, offsetOfSecond, shiftNs = -100 * s).toList()
+        val lines = runBlocking { earlierLines(file, offsetOfSecond, shiftNs = -100 * s).toList() }
         assertEquals(listOf(hr(3 * s, 63)), lines.map { (it as RawLine.Record).record })
+    }
+
+    /**
+     * The JSON encoder writes characters outside ASCII as they are, so one in the header takes more
+     * bytes than characters, and every place mapped after it must still be where its line starts.
+     */
+    @Test
+    fun placesAreMappedInBytesSoACharacterOutsideAsciiMovesNothing() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s).let { it.copy(phone = it.phone.copy(model = "Téléphone")) }
+        val file = write(a, hr(101 * s, 61), hr(103 * s, 63))
+        val headerLine = file.readLines().first()
+        assertTrue("the header holds more bytes than characters", headerLine.toByteArray().size > headerLine.length)
+        val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "a")
+        val mapped = readEarlierTrends(MonitorModel(), folder.root, b).read.single()
+        val mark = requireNotNull(mapped.timeline.markAtOrBefore(103 * s))
+        // The line at 103 s starts after the header and the first heart rate, counted in bytes;
+        // counted in characters it would be two short, inside the line before.
+        assertEquals(file.readLines().take(2).sumOf { it.toByteArray().size + 1 }.toLong(), mark.offset)
+        // Read from the place mapped for 103 s, the first line is the heart rate at 103 s itself.
+        val lines = runBlocking { earlierLines(file, mark.offset, shiftNs = 0).toList() }
+        assertEquals(hr(103 * s, 63), (lines.first() as RawLine.Record).record)
+    }
+
+    @Test
+    fun anEarlierFileReadFromPartWayThroughALineStartsAtTheNextAndLeavesOutATornLastLine() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        val file = write(a, hr(101 * s, 61), hr(103 * s, 63))
+        file.appendText("{\"type\":\"hr\",\"cut off")
+        val partWayThroughTheFirstHeartRate = file.readLines().first().length + 5L
+        val lines = runBlocking { earlierLines(file, partWayThroughTheFirstHeartRate, shiftNs = 0).toList() }
+        assertEquals(listOf(hr(103 * s, 63)), lines.map { (it as RawLine.Record).record })
     }
 }

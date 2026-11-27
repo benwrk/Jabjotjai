@@ -1,5 +1,6 @@
 package com.benwrk.jabjotjai.raw
 
+import com.benwrk.jabjotjai.monitor.EarlierChain
 import com.benwrk.jabjotjai.monitor.MonitorModel
 import com.benwrk.jabjotjai.monitor.TrendSnapshot
 import com.benwrk.jabjotjai.monitor.earlierCaptures
@@ -47,7 +48,7 @@ class ReferenceRecordingsTest {
     fun aResumedCapturesTrendsReachBackThroughTheFileItContinues() {
         val dir = File(root, "1.2")
         val current = requireNotNull(RawTail.readHeader(File(dir, "20261127T131715Z-5794.jsonl")))
-        assertEquals(listOf("20261127T131351Z-3af1.jsonl"), earlierCaptures(dir, current).map { it.first.name })
+        assertEquals(listOf("20261127T131351Z-3af1.jsonl"), earlierCaptures(dir, current).files.map { it.first.name })
 
         val model = MonitorModel()
         readEarlierTrends(model, dir, current)
@@ -62,6 +63,7 @@ class ReferenceRecordingsTest {
     fun aCaptureWhoseEarlierFileIsNotKeptHasNothingToReachBackTo() {
         val dir = File(root, "1.2")
         val current = requireNotNull(RawTail.readHeader(File(dir, "20261127T152036Z-31fd.jsonl")))
-        assertEquals(emptyList<String>(), earlierCaptures(dir, current).map { it.first.name })
+        // The file it continues is not among the reference recordings, so the chain breaks there.
+        assertEquals(EarlierChain(files = emptyList(), brokenAt = current.continues), earlierCaptures(dir, current))
     }
 }

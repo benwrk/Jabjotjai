@@ -319,8 +319,14 @@ class CaptureService : Service() {
      * recording that could not be read, never thrown into the capture's own reading.
      */
     private suspend fun readEarlierTrendsOf(file: File) {
-        val header = runCatching { RawTail.readHeader(file) }.getOrNull() ?: return
-        val dir = file.parentFile ?: return
+        val header = runCatching { RawTail.readHeader(file) }.getOrNull()
+        val dir = file.parentFile
+        if (header == null || dir == null) {
+            // The file's own header names the file it continues; without it, the earlier files cannot
+            // be found, which is shown as a failure rather than as a capture that continues nothing.
+            Capture.publishEarlierTrends(EarlierTrends.Read(file.nameWithoutExtension, TrendSnapshot.EMPTY, TrendSnapshot.EMPTY, unreadable = 1))
+            return
+        }
         val session = header.session
         val context = currentCoroutineContext()
         val startedNs = SystemClock.elapsedRealtimeNanos()

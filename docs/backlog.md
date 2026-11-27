@@ -44,35 +44,15 @@ is the entry "Record a stream that goes silent" below.
 - `CaptureRecovery.find` writes the ending note and reads the file without catching a failure,
   so with the disk full the picker's call would throw, likely on every opening of the app (not
   tried).
+- `CaptureRecovery.lastLines` decodes with `RawCodec.decode`, not the decoder the header's schema
+  names (decision `0006`); decoding by the header can fail on a header that cannot be read, which
+  is why it waits for recovery to report failures.
 - Nothing checks free space before or during a capture.
 
 Done when after a failed write the file still ends at a line boundary or the next write starts
-a new line, recovery reports a failure instead of throwing, the app warns before starting with
-little space and during a capture when space runs low, and tests cover a write that fails.
-
-## Read earlier files by the byte, and report what cannot be read
-
-`readEarlierTrends` counts a line's characters as its bytes when it maps times to places in an
-earlier file. kotlinx-serialization-json 1.9.0 escapes only control characters, the quote and the
-backslash, and writes every other character as it is (`StringOps.kt`, `printQuoted`, its sources
-jar, read 2026-11-28), so one non-ASCII character in a string field (the phone's model, the
-strap's name, an SDK error message) shifts every later place in that file, and the past reader
-starts part-way through a line. Every string written on the test phone so far is ASCII. Also,
-found by reading and not yet tried:
-
-- `earlierLines` opens the file inside a `sequence`, whose `use` never closes it when reading
-  stops early, as every scrub step and every cancelled replay does.
-- One earlier file that cannot be read ends the whole past read instead of being skipped, and
-  its error stays on screen after going live.
-- A missing or unreadable file ends the chain silently; when it is the first, `EarlierTrends.None`
-  is published, which reads as "continues nothing" (`AGENTS.md`: a failure never becomes the value
-  that means nothing). `aMissingEarlierFileEndsTheChain` pins that.
-- `CaptureRecovery.lastLines` decodes with `RawCodec.decode`, not the decoder the header's
-  schema names (decision `0006`).
-
-Done when offsets are counted in bytes, a test with a non-ASCII field reads from the right place,
-the file is closed however reading stops, an unreadable earlier file is skipped and counted, a
-broken chain is shown as a failure, and `lastLines` decodes through `RawDecoders`.
+a new line, recovery reports a failure instead of throwing and decodes by the header's schema,
+the app warns before starting with little space and during a capture when space runs low, and
+tests cover a write that fails.
 
 ## Say what the stored times measure
 
