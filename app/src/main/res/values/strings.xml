@@ -36,7 +36,9 @@
     <string name="monitor_no_value">—</string>
     <string name="monitor_contact_ok">Skin contact</string>
     <string name="monitor_contact_none">No skin contact</string>
+    <string name="monitor_contact_unknown">Skin contact —</string>
     <string name="monitor_battery">Battery %1$d%%</string>
+    <string name="monitor_battery_none">Battery —</string>
     <string name="monitor_gaps">Gaps %1$d</string>
     <string name="monitor_waiting">Waiting for the strap</string>
     <string name="monitor_connecting">Connecting</string>

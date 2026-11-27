@@ -405,12 +405,17 @@ private fun Details(heartRate: HeartRate?, snapshot: MonitorSnapshot, beepError:
             heartRate?.lastRrMs?.let { stringResource(R.string.monitor_rr, it) } ?: stringResource(R.string.monitor_rr_none),
             color = MonitorColors.Ecg,
         )
+        // Every row is always there, with a dash while its value is unknown, so the rows below
+        // never move when a value comes and goes.
         when (heartRate?.contact) {
             true -> Text(stringResource(R.string.monitor_contact_ok), color = MonitorColors.Secondary)
             false -> Text(stringResource(R.string.monitor_contact_none), color = MonitorColors.Warning)
-            null -> Unit
+            null -> Text(stringResource(R.string.monitor_contact_unknown), color = MonitorColors.Secondary)
         }
-        snapshot.batteryPct?.let { Text(stringResource(R.string.monitor_battery, it), color = MonitorColors.Secondary) }
+        Text(
+            snapshot.batteryPct?.let { stringResource(R.string.monitor_battery, it) } ?: stringResource(R.string.monitor_battery_none),
+            color = MonitorColors.Secondary,
+        )
         Text(stringResource(R.string.monitor_gaps, snapshot.gaps), color = if (snapshot.gaps > 0) MonitorColors.Warning else MonitorColors.Secondary)
         beepError?.let { Text(stringResource(R.string.monitor_beep_unavailable, it), color = MonitorColors.Warning) }
         // Battery optimisation may refuse the restart that resumes a capture Android stopped
