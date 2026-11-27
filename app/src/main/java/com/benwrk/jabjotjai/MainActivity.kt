@@ -8,9 +8,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -85,8 +88,11 @@ class MainActivity : ComponentActivity() {
 private fun App(scanViewModel: ScanViewModel, monitorViewModel: MonitorViewModel) {
     val context = LocalContext.current
     val state by Capture.state.collectAsState()
-    Scaffold(containerColor = MonitorColors.Background) { insets ->
-        Box(Modifier.fillMaxSize().padding(insets)) {
+    // The monitor keeps its bars clear of the system bars and the camera cut-out itself, so that its
+    // chart can reach under the cut-out (see MonitorScreen); every other screen keeps clear of both.
+    Scaffold(containerColor = MonitorColors.Background, contentWindowInsets = WindowInsets(0)) {
+        val insets = if (state is CaptureState.Running) Modifier else Modifier.windowInsetsPadding(ScaffoldDefaults.contentWindowInsets)
+        Box(Modifier.fillMaxSize().then(insets)) {
             BluetoothPermissionGate {
                 when (val current = state) {
                     is CaptureState.Running -> MonitorScreen(

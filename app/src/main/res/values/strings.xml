@@ -100,6 +100,8 @@
     <string name="display_gain_step">×%1$s</string>
     <string name="display_pulse">Calibration pulse</string>
     <string name="display_pulse_hint">A 1 mV pulse at the left of the ECG, rising from the line where the trace draws 0 mV.</string>
+    <string name="display_under_cutout">Chart under the camera</string>
+    <string name="display_under_cutout_hint">The waveforms and graphs reach the edge of the screen behind the camera, with their labels kept clear of it.</string>
     <string name="display_rows">Rows</string>
     <string name="display_rows_hint">Below a row of the same signal, a row can be separate, at its own speed; cascaded, carrying the trace on from the row above; or joined to it as one taller graph.</string>
     <string name="display_row">Row %1$d</string>

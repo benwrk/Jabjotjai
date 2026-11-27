@@ -28,6 +28,7 @@ object DisplaySettingsStore {
     private const val BEEP_VOLUME = "beep_volume"
     private const val TIME_FROM_START = "time_from_start"
     private const val CHART_ROWS = "chart_rows"
+    private const val CHART_UNDER_CUTOUT = "chart_under_cutout"
 
     private val mutableSettings = MutableStateFlow(DisplaySettings())
     val settings: StateFlow<DisplaySettings> = mutableSettings.asStateFlow()
@@ -71,6 +72,7 @@ object DisplaySettingsStore {
             timeFromStart = prefs.getBoolean(TIME_FROM_START, defaults.timeFromStart),
             // Rows kept by 0.4 had the one sweep speed of their day.
             rows = prefs.getString(CHART_ROWS, null)?.let { decodeChartRows(it, legacySpeed = sweep) } ?: defaults.rows,
+            chartUnderCutout = prefs.getBoolean(CHART_UNDER_CUTOUT, defaults.chartUnderCutout),
         )
     }
 
@@ -87,6 +89,7 @@ object DisplaySettingsStore {
                 .putFloat(BEEP_VOLUME, settings.beepVolume)
                 .putBoolean(TIME_FROM_START, settings.timeFromStart)
                 .putString(CHART_ROWS, encodeChartRows(settings.rows))
+                .putBoolean(CHART_UNDER_CUTOUT, settings.chartUnderCutout)
         }
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -61,6 +62,7 @@ fun TrendTrace(
     modifier: Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
+    val cutout = LocalCutout.current
     Canvas(modifier) {
         val series = trends()
         if (series.all { it.size == 0 } || size.width <= 0f) return@Canvas
@@ -111,8 +113,12 @@ fun TrendTrace(
         val top = textMeasurer.measure(high.toString(), style)
         val bottom = textMeasurer.measure(low.toString(), style)
         val margin = 4.dp.toPx()
-        drawText(top, topLeft = Offset(size.width - top.size.width - margin, margin))
-        drawText(bottom, topLeft = Offset(size.width - bottom.size.width - margin, size.height - bottom.size.height - margin))
+        // Each moved left of the camera cut-out if it would be under it.
+        for ((text, y) in listOf(top to margin, bottom to size.height - bottom.size.height - margin)) {
+            val x = size.width - text.size.width - margin
+            val shift = clearanceLeft(Rect(x, y, x + text.size.width, y + text.size.height), cutout, CUTOUT_GAP.toPx())
+            drawText(text, topLeft = Offset(x - shift, y))
+        }
     }
 }
 

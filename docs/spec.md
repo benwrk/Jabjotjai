@@ -191,8 +191,9 @@ Built and seen working on the test phone, except moving an earlier file's times 
 The current scope.
 
 1. **The chart can use the whole display**, the camera cut-out included: an option in the cog menu
-   lets the waveforms and graphs draw under the cut-out instead of stopping short of it. Whether
-   it is on by default is not yet decided.
+   lets the waveforms and graphs draw under the cut-out instead of stopping short of it, while the
+   bars above and below the chart keep clear of it. A label or calibration pulse the camera would
+   cover moves clear of it; the rest stay at the edge. Off by default.
 2. **A fresh install shows two cascaded ECG rows, then heart-rate and RR rows**: two ECG rows
    cascaded into one sweep at 25 mm/s, then heart-rate and RR rows of 15 minutes each that sweep,
    in place of 0.3's ECG above the accelerometer. Rows kept by an earlier version stay as they were.

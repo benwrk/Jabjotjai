@@ -9,15 +9,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
@@ -37,10 +44,14 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
@@ -48,6 +59,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -149,10 +161,18 @@ fun MonitorScreen(
     val captureStartNs = (earlier.value as? EarlierTrends.Read)?.files?.firstOrNull()?.startNs ?: live.value.snapshot.header?.start?.monoNs
     val bands = remember(pxPerMm, session) { Bands(waves, trends, earlier, displayClock, pxPerMm, settings, scales, bandMm) }
     val playheadAtSecond = playback.value.positionNs(secondsClock.value)
-    BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background)) {
+    // The system bars and the camera cut-out, which every other screen keeps clear of whole. Here the
+    // bars above and below the chart keep clear of both, and the chart, if set to, reaches under the
+    // cut-out with its labels moved clear of it (see Band).
+    val safe = ScaffoldDefaults.contentWindowInsets
+    val underCutout = settings.value.chartUnderCutout
+    val chartSides = if (underCutout) WindowInsets.systemBars else safe
+    val cutout = if (underCutout) rememberCutoutInWindow() else emptyList()
+    BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background).windowInsetsPadding(safe.only(WindowInsetsSides.Vertical))) {
         val wide = maxWidth >= WIDE_TOP_BAR
         Column(Modifier.fillMaxSize()) {
             MonitorTopBar(
+                modifier = Modifier.windowInsetsPadding(safe.only(WindowInsetsSides.Horizontal)),
                 sensorId = running.sensorId,
                 sensorName = running.sensorName,
                 live = live.value.snapshot,
@@ -167,10 +187,12 @@ fun MonitorScreen(
                 Text(
                     stringResource(R.string.monitor_read_error, it),
                     color = MonitorColors.Alarm,
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.windowInsetsPadding(safe.only(WindowInsetsSides.Horizontal)).padding(horizontal = 12.dp),
                 )
             }
-            Waveforms(bands, Modifier.weight(1f).fillMaxWidth())
+            CompositionLocalProvider(LocalCutout provides cutout) {
+                Waveforms(bands, Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(chartSides.only(WindowInsetsSides.Horizontal)))
+            }
             PlaybackBar(
                 playback = playback.value,
                 startNs = captureStartNs,
@@ -185,7 +207,7 @@ fun MonitorScreen(
                 onSpeed = viewModel::setSpeed,
                 onLive = viewModel::goLive,
                 onJump = viewModel::jump,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().windowInsetsPadding(safe.only(WindowInsetsSides.Horizontal)),
             )
         }
     }
@@ -333,15 +355,40 @@ private fun bandOffset(ladder: ScaleLadder, scale: State<BandScale>, pxPerMm: Fl
     (value - current.centre) * ladder.mmPerSample(current.index) * pxPerMm
 }
 
-/** One waveform band: its traces across the full width, the label at the top left and a thin rule below. */
+/**
+ * One waveform band: its traces across the full width, the label at the top left and a thin rule
+ * below. Where the chart reaches under the camera cut-out, the label moves right of the camera if
+ * it would be under it, and what is drawn inside reads the cut-out in the band's own coordinates
+ * from [LocalCutout], to move clear of it the same way.
+ */
 @Composable
 private fun Band(label: @Composable () -> Unit, modifier: Modifier, content: @Composable () -> Unit) {
-    Box(modifier.fillMaxWidth()) {
-        content()
-        Box(Modifier.padding(start = 8.dp, top = 2.dp)) { label() }
+    val cutoutInWindow = LocalCutout.current
+    var bandInWindow by remember { mutableStateOf(Rect.Zero) }
+    var labelSize by remember { mutableStateOf(IntSize.Zero) }
+    val cutout = remember(cutoutInWindow, bandInWindow) {
+        cutoutInWindow.map { it.translate(-bandInWindow.left, -bandInWindow.top) }
+    }
+    val density = LocalDensity.current
+    val labelShift = with(density) {
+        val start = LABEL_START.toPx()
+        val top = LABEL_TOP.toPx()
+        clearanceRight(Rect(start, top, start + labelSize.width, top + labelSize.height), cutout, CUTOUT_GAP.toPx()).toDp()
+    }
+    Box(modifier.fillMaxWidth().onGloballyPositioned { bandInWindow = it.boundsInWindow() }) {
+        CompositionLocalProvider(LocalCutout provides cutout) {
+            content()
+        }
+        Box(Modifier.padding(start = LABEL_START + labelShift, top = LABEL_TOP).onSizeChanged { labelSize = it }) { label() }
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(MonitorColors.Divider))
     }
 }
+
+private val LABEL_START = 8.dp
+private val LABEL_TOP = 2.dp
+
+/** How far clear of the camera cut-out a label or the calibration pulse is kept. */
+internal val CUTOUT_GAP = 4.dp
 
 /** Where the calibration pulse starts, from the band's left edge, and how far its feet reach either side. */
 private const val PULSE_LEFT_MM = 3f
@@ -359,6 +406,7 @@ private const val PULSE_SECONDS = 0.2f
  */
 @Composable
 private fun CalibrationPulse(bands: Bands, speed: SweepSpeed, modifier: Modifier) {
+    val cutout = LocalCutout.current
     Canvas(modifier) {
         val scale = bands.ecgScale.value
         val pxPerMicrovolt = ScaleLadder.ECG.mmPerSample(scale.index) * bands.pxPerMm
@@ -368,9 +416,12 @@ private fun CalibrationPulse(bands: Bands, speed: SweepSpeed, modifier: Modifier
         val zero = (size.height / 2f + scale.centre * pxPerMicrovolt).coerceIn(ceiling, floor)
         val height = 1_000 * pxPerMicrovolt
         val top = maxOf(zero - height, ceiling)
-        val left = PULSE_LEFT_MM * bands.pxPerMm
-        val right = left + PULSE_SECONDS * speed.mmPerSecond * bands.pxPerMm
         val foot = PULSE_FOOT_MM * bands.pxPerMm
+        val width = PULSE_SECONDS * speed.mmPerSecond * bands.pxPerMm
+        val nominalLeft = PULSE_LEFT_MM * bands.pxPerMm
+        // Moved right of the camera cut-out if it would be under it.
+        val left = nominalLeft + clearanceRight(Rect(nominalLeft - foot, top, nominalLeft + width + foot, zero), cutout, CUTOUT_GAP.toPx())
+        val right = left + width
         val path = Path().apply {
             moveTo(left - foot, zero)
             lineTo(left, zero)
