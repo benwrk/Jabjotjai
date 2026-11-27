@@ -186,9 +186,14 @@ Built and seen working on the test phone, except moving an earlier file's times 
    file, and playing on carries across into the next; the time between files shows as a gap, never
    joined. Until the earlier files have been read, the timeline starts at the current file.
 
-## 0.7: the next version
+## 0.7: the chart under the camera, a value under the finger, and a battery shortcut
 
-The current scope.
+Built and seen working on the test phone (Galaxy S25, camera hole in the middle of the top edge),
+except: a camera in a corner of the screen, which only unit tests cover; the screens before a
+capture, which now keep clear of the system bars and the camera themselves rather than through
+the app's frame, not yet looked at since; and the fixes that only a failure shows, such as the
+message when the last capture cannot be checked and a failed stream starting again on the strap
+(`docs/backlog.md`).
 
 1. **The chart can use the whole display**, the camera cut-out included: an option in the cog menu
    lets the monitor reach the screen's edges under the cut-out instead of stopping short of it. A
