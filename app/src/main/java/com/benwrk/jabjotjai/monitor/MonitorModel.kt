@@ -143,19 +143,14 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
                     )
                     // The 1/1024 s values as sent, rather than the SDK's rounded milliseconds.
                     if (record.rrAvailable) beats.accept(record.monoNs, record.rr1024.map { it * NS_PER_SECOND / 1024 })
-                    if (record.bpm > 0) heartRateTrend.append(record.monoNs, record.bpm)
-                    if (record.rrAvailable) {
-                        val ends = rrEndTimes(record.monoNs, record.rrMs)
-                        record.rrMs.forEachIndexed { i, rr -> rrTrend.append(ends[i], rr) }
-                    }
+                    appendTrends(record, shiftNs = 0)
                 }
                 is EventRecord -> when (record.event) {
                     RawEvents.CONNECTING, RawEvents.CONNECTED -> connection = record.event
                     RawEvents.DISCONNECTED -> {
                         connection = record.event
                         beats.restart()
-                        heartRateTrend.breakAt(record.monoNs)
-                        rrTrend.breakAt(record.monoNs)
+                        breakTrends(record.monoNs)
                     }
                     RawEvents.BATTERY -> batteryPercentage = record.levelPct
                 }
@@ -163,13 +158,42 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
                     gaps++
                     if (record.stream == RawStreams.HR) {
                         beats.restart()
-                        heartRateTrend.breakAt(record.fromMonoNs)
-                        rrTrend.breakAt(record.fromMonoNs)
+                        breakTrends(record.fromMonoNs)
                     }
                 }
                 is EndRecord -> ended = true
             }
         }
+    }
+
+    /**
+     * Takes [line] from a file this capture continues into the heart-rate and RR history only, its
+     * times moved by [shiftNs] onto this file's clock (see [clockShiftNs]): nothing else of an
+     * earlier file is shown. Its gaps and disconnections break the history, as this file's do.
+     */
+    fun acceptEarlier(line: RawLine, shiftNs: Long) {
+        when (val record = (line as? RawLine.Record)?.record) {
+            is HrRecord -> appendTrends(record, shiftNs)
+            is GapRecord -> if (record.stream == RawStreams.HR) breakTrends(record.fromMonoNs + shiftNs)
+            is EventRecord -> if (record.event == RawEvents.DISCONNECTED) breakTrends(record.monoNs + shiftNs)
+            else -> Unit
+        }
+    }
+
+    /** Ends an earlier file at [atNs]: the time until the next file is a break, never joined. */
+    fun endEarlier(atNs: Long) = breakTrends(atNs)
+
+    private fun appendTrends(record: HrRecord, shiftNs: Long) {
+        if (record.bpm > 0) heartRateTrend.append(record.monoNs + shiftNs, record.bpm)
+        if (record.rrAvailable) {
+            val ends = rrEndTimes(record.monoNs + shiftNs, record.rrMs)
+            record.rrMs.forEachIndexed { i, rr -> rrTrend.append(ends[i], rr) }
+        }
+    }
+
+    private fun breakTrends(atNs: Long) {
+        heartRateTrend.breakAt(atNs)
+        rrTrend.breakAt(atNs)
     }
 
     fun snapshot(): MonitorSnapshot = MonitorSnapshot(

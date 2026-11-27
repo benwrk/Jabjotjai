@@ -22,6 +22,7 @@ import com.benwrk.jabjotjai.monitor.DisplaySettingsStore
 import com.benwrk.jabjotjai.monitor.MonitorModel
 import com.benwrk.jabjotjai.monitor.beepAtBeats
 import com.benwrk.jabjotjai.monitor.beepGain
+import com.benwrk.jabjotjai.monitor.readEarlierTrends
 import com.benwrk.jabjotjai.monitor.timeMonoNs
 import com.benwrk.jabjotjai.raw.AccRecord
 import com.benwrk.jabjotjai.raw.EcgRecord
@@ -261,6 +262,14 @@ class CaptureService : Service() {
      */
     private suspend fun readLive(file: File) {
         val model = MonitorModel(keepNs = 0)
+        // The heart-rate and RR history of the files this capture continues, before its own (0.6).
+        try {
+            withContext(Dispatchers.IO) { RawTail.readHeader(file)?.let { readEarlierTrends(model, file.parentFile ?: return@let, it) } }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "cannot read the trends of the files this capture continues", e)
+        }
         // Mapped as it is read, so the monitor can jump back to any moment (see CaptureTimeline).
         val timeline = CaptureTimeline()
         Capture.publishLive(LiveReading.EMPTY.copy(timeline = timeline))
