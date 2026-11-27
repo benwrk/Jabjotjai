@@ -6,3 +6,9 @@ scripts/*.sh text eol=lf
 # replaced in them (see their README), so git must not touch their line endings.
 app/src/test/resources/raw-reference/**/*.jsonl -text
 app/src/test/resources/raw-reference/**/*.json -text
+# Packaged into the APK as they are, so a build on Windows ships the same bytes as CI's.
+app/src/main/assets/** text eol=lf
+# The wrapper scripts run under sh and cmd respectively, and the wrapper jar is binary.
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
