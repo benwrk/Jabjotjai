@@ -2,7 +2,6 @@
     <string name="app_name">Jabjotjai</string>
 
     <string name="capture_channel_name">Live capture</string>
-    <string name="capture_notification_title">Capturing from your strap</string>
     <string name="stop">Stop</string>
 
     <string name="permission_title">Bluetooth access</string>
@@ -47,4 +46,8 @@
     <string name="display_gain_step">×%1$s</string>
     <string name="display_beep">Beat beep</string>
     <string name="display_beep_hint">One beep for each beat the strap reports, while this screen is on. It follows the media volume.</string>
+
+    <string name="capture_notification_hr">HR %1$d bpm</string>
+    <string name="capture_notification_hr_none">HR —</string>
+    <string name="capture_notification_read_error">Cannot read the raw file</string>
 </resources>

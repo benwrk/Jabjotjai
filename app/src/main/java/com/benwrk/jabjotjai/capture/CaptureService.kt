@@ -15,18 +15,24 @@ import android.os.PowerManager
 import android.util.Log
 import com.benwrk.jabjotjai.MainActivity
 import com.benwrk.jabjotjai.R
+import com.benwrk.jabjotjai.monitor.MonitorModel
 import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.Phone
 import com.benwrk.jabjotjai.raw.RAW_SCHEMA
+import com.benwrk.jabjotjai.raw.RawEvents
+import com.benwrk.jabjotjai.raw.RawTail
 import com.benwrk.jabjotjai.raw.RawWriter
 import com.benwrk.jabjotjai.raw.Sensor
 import com.benwrk.jabjotjai.raw.Stamp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -49,6 +55,13 @@ class CaptureService : Service() {
     private val scope = CoroutineScope(
         SupervisorJob() + captureDispatcher + CoroutineExceptionHandler { _, error -> fail(error) },
     )
+
+    /**
+     * Keeps the notification current, on the main thread. Separate from [scope] because a failure
+     * there must not end the capture, and [finish] cancels it before taking the notification down,
+     * so a late update cannot put it back.
+     */
+    private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     // Touched only on the main thread.
     private var running = false
@@ -77,14 +90,18 @@ class CaptureService : Service() {
     private fun start(sensorId: String, sensorName: String, sensorAddress: String) {
         if (running) return
         running = true
-        startForeground(NOTIFICATION_ID, notification(sensorName), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+        val clock = SystemPhoneClock
+        val start = clock.stamp()
+        startForeground(
+            NOTIFICATION_ID,
+            notification(sensorName, start.wallMs, NotificationContent.STARTING),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+        )
         wakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Jabjotjai:capture")
             .apply { acquire() }
 
         val api = PolarApi.get(this)
-        val clock = SystemPhoneClock
-        val start = clock.stamp()
         val sessionId = SessionNames.newId(start.wallMs)
         val file = SessionNames.rawFile(File(filesDir, RAW_DIRECTORY), sessionId)
         val header = header(sessionId, start, Sensor(id = sensorId, name = sensorName, address = sensorAddress))
@@ -92,6 +109,8 @@ class CaptureService : Service() {
         scope.launch {
             val newSession = CaptureSession(RawWriter.create(file, clock::monoNs))
             newSession.start(header)
+            // The file exists from here on, which a tail needs.
+            notificationScope.launch { keepNotificationCurrent(file, sensorName, start.wallMs) }
             session = newSession
             link = PolarH10Link(api, sensorId, sensorAddress, newSession, clock, scope).also { it.connect() }
             Capture.publish(CaptureState.Running(file, sensorId, sensorName))
@@ -146,6 +165,7 @@ class CaptureService : Service() {
     }
 
     private fun finish() {
+        notificationScope.coroutineContext.cancelChildren()
         wakeLock?.takeIf { it.isHeld }?.release()
         wakeLock = null
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -153,6 +173,7 @@ class CaptureService : Service() {
     }
 
     override fun onDestroy() {
+        notificationScope.cancel()
         if (running) {
             // The system is destroying the service mid-capture: end the file properly before the
             // capture thread goes away.
@@ -180,7 +201,46 @@ class CaptureService : Service() {
         )
     }
 
-    private fun notification(sensorName: String): Notification {
+    /**
+     * Shows what the raw file says, the way the monitor does: by tailing it (`AGENTS.md`, "Live is
+     * a reader tailing the raw file"), so a capture that stops writing shows as one. It reads
+     * continuously, which keeps the connection and battery events from early in the file, but
+     * posts only while the screen is on, since nobody can see it otherwise. The system "might drop
+     * updates" posted "many in less than one second"
+     * (developer.android.com/develop/ui/views/notifications/build-notification, read 2026-11-27),
+     * so it posts at most once a second, and only when the text has changed.
+     */
+    private suspend fun keepNotificationCurrent(file: File, sensorName: String, startWallMs: Long) {
+        val manager = getSystemService(NotificationManager::class.java)
+        val power = getSystemService(PowerManager::class.java)
+        val model = MonitorModel(keepNs = 0)
+        var readFailed = false
+        coroutineScope {
+            launch {
+                try {
+                    RawTail(file, pollIntervalMs = NOTIFICATION_TAIL_POLL_MS).lines().collect(model::accept)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "the notification cannot read the raw file", e)
+                    readFailed = true
+                }
+            }
+            var shown: NotificationContent? = null
+            while (true) {
+                if (power.isInteractive) {
+                    val content = NotificationContent.of(model.snapshot(), SystemPhoneClock.monoNs(), readFailed)
+                    if (content != shown && running) {
+                        manager.notify(NOTIFICATION_ID, notification(sensorName, startWallMs, content))
+                        shown = content
+                    }
+                }
+                delay(NOTIFICATION_UPDATE_MS)
+            }
+        }
+    }
+
+    private fun notification(sensorName: String, startWallMs: Long, content: NotificationContent): Notification {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, getString(R.string.capture_channel_name), NotificationManager.IMPORTANCE_LOW),
@@ -192,10 +252,36 @@ class CaptureService : Service() {
             PendingIntent.FLAG_IMMUTABLE,
         )
         val stop = PendingIntent.getService(this, 1, stopIntent(this), PendingIntent.FLAG_IMMUTABLE)
+        val details = if (content.readFailed) {
+            getString(R.string.capture_notification_read_error)
+        } else {
+            listOfNotNull(
+                getString(
+                    when (content.connection) {
+                        RawEvents.CONNECTED -> R.string.monitor_connected
+                        RawEvents.CONNECTING -> R.string.monitor_connecting
+                        RawEvents.DISCONNECTED -> R.string.monitor_disconnected
+                        else -> R.string.monitor_waiting
+                    },
+                ),
+                getString(R.string.monitor_gaps, content.gaps),
+                content.batteryPct?.let { getString(R.string.monitor_battery, it) },
+            ).joinToString(" · ")
+        }
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_capture)
-            .setContentTitle(getString(R.string.capture_notification_title))
-            .setContentText(sensorName)
+            .setContentTitle(content.bpm?.let { getString(R.string.capture_notification_hr, it) } ?: getString(R.string.capture_notification_hr_none))
+            .setContentText(details)
+            .setSubText(sensorName)
+            // The system draws the elapsed time itself, counting up from `when`, between updates.
+            .setWhen(startWallMs)
+            .setShowWhen(true)
+            .setUsesChronometer(true)
+            // The owner's choice: heart rate shows on the lock screen. PUBLIC is documented as "Show
+            // this notification in its entirety on all lockscreens" (Notification.VISIBILITY_PUBLIC,
+            // SDK 37 source, read 2026-11-27).
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, getString(R.string.stop), stop).build())
@@ -212,6 +298,10 @@ class CaptureService : Service() {
         private const val CHANNEL_ID = "capture"
         private const val NOTIFICATION_ID = 1
         private const val SYNC_TICK_MS = 1_000L
+        private const val NOTIFICATION_UPDATE_MS = 1_000L
+
+        /** Slower than the monitor's tail: the notification changes at most once a second. */
+        private const val NOTIFICATION_TAIL_POLL_MS = 250L
 
         /** Raw files live in `files/raw/` (`docs/raw-format.md`). */
         const val RAW_DIRECTORY = "raw"

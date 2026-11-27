@@ -42,7 +42,9 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
    file, so what is shown is exactly what is stored (`AGENTS.md`, "Live is a reader tailing the
    raw file"). The files are kept. There is no recording feature yet: no session list, no export.
 4. **The connection stays up when the app is in the background**, in a foreground service, until
-   the user stops it.
+   the user stops it. Its notification shows the strap's heart rate, the connection, the gap
+   count, the strap's battery and the time since the start, read by tailing the raw file like the
+   monitor. It shows all of that on the lock screen.
 5. **The layout adapts to orientation.** Landscape is the monitor layout, with waveforms on the
    left and numerics on the right; portrait stacks the numerics above the waveforms.
 

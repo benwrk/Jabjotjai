@@ -51,6 +51,12 @@ showed it. Done when a stream that has started, or has delivered, and then sends
 set time while connected is recorded as such in the raw file, with the time chosen from each
 stream's measured frame interval, and a test shows the record being written.
 
+## Let the user hide heart rate from the lock screen
+
+The capture notification shows heart rate on the lock screen, the owner's chosen default
+(`docs/spec.md`, 0.1 item 4). Done when a setting switches the notification to showing only that
+a capture is running and for how long, with the full content after unlocking.
+
 ## Confirm the agent conventions in a fresh Claude Code session
 
 Two mechanisms can only fire at session start or once per session, so neither has been observed
