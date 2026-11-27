@@ -159,4 +159,32 @@ class MonitorModelTest {
         assertArrayEquals(longArrayOf(1, 2), before.ecg.tNs)
         assertEquals(3_000, model.snapshot().ecg.size)
     }
+
+    @Test
+    fun keepsTheHeartRateAndEachRrIntervalAtTheTimeItEnded() {
+        val s = 1_000_000_000L
+        val model = MonitorModel()
+        // One frame at 10 s with two intervals: 1000 ms, then 500 ms.
+        model.feed(hr(10 * s, 1024, 512))
+        val snapshot = model.snapshot()
+        assertEquals(listOf(10 * s), snapshot.heartRateTrend.tNs.take(snapshot.heartRateTrend.size))
+        assertEquals(listOf(60), snapshot.heartRateTrend.values.take(snapshot.heartRateTrend.size))
+        // The last interval ended when the frame arrived, the one before it 500 ms earlier.
+        assertEquals(listOf(10 * s - 500_000_000L, 10 * s), snapshot.rrTrend.tNs.take(snapshot.rrTrend.size))
+        assertEquals(listOf(1000, 500), snapshot.rrTrend.values.take(snapshot.rrTrend.size))
+    }
+
+    @Test
+    fun aHeartRateGapBreaksTheTrendsOnceAndAnEcgGapDoesNot() {
+        val s = 1_000_000_000L
+        val model = MonitorModel()
+        model.feed(hr(1 * s, 1024), GapRecord(RawStreams.ECG, RawEvents.STREAM_ERROR, fromMonoNs = 2 * s), hr(3 * s, 1024))
+        model.feed(
+            GapRecord(RawStreams.HR, RawEvents.DISCONNECTED, fromMonoNs = 4 * s),
+            GapRecord(RawStreams.HR, RawEvents.DISCONNECTED, fromMonoNs = 4 * s),
+            hr(6 * s, 1024),
+        )
+        val trend = model.snapshot().heartRateTrend
+        assertEquals(listOf(60, 60, TrendSnapshot.BREAK, 60), trend.values.take(trend.size))
+    }
 }

@@ -42,6 +42,10 @@ data class MonitorSnapshot(
     val gaps: Int,
     /** When to signal the strap's recent beats, on the phone's monotonic clock, oldest first (see [BeatSchedule]). */
     val beats: List<Long>,
+    /** Heart rate as the strap reported it, the whole capture, for the heart-rate rows. */
+    val heartRateTrend: TrendSnapshot,
+    /** Each RR interval in ms, at the time it ended (see [rrEndTimes]), for the RR rows. */
+    val rrTrend: TrendSnapshot,
     val unknownLines: Int,
     val malformedLines: Int,
     val ended: Boolean,
@@ -60,6 +64,8 @@ data class MonitorSnapshot(
             connection = null,
             gaps = 0,
             beats = emptyList(),
+            heartRateTrend = TrendSnapshot.EMPTY,
+            rrTrend = TrendSnapshot.EMPTY,
             unknownLines = 0,
             malformedLines = 0,
             ended = false,
@@ -77,6 +83,8 @@ data class MonitorSnapshot(
 class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
 
     private val beats = BeatSchedule()
+    private val heartRateTrend = TrendSeries()
+    private val rrTrend = TrendSeries()
     private val ecg = SampleSeries()
     private val accX = SampleSeries()
     private val accY = SampleSeries()
@@ -133,18 +141,29 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
                     )
                     // The 1/1024 s values as sent, rather than the SDK's rounded milliseconds.
                     if (record.rrAvailable) beats.accept(record.monoNs, record.rr1024.map { it * NS_PER_SECOND / 1024 })
+                    if (record.bpm > 0) heartRateTrend.append(record.monoNs, record.bpm)
+                    if (record.rrAvailable) {
+                        val ends = rrEndTimes(record.monoNs, record.rrMs)
+                        record.rrMs.forEachIndexed { i, rr -> rrTrend.append(ends[i], rr) }
+                    }
                 }
                 is EventRecord -> when (record.event) {
                     RawEvents.CONNECTING, RawEvents.CONNECTED -> connection = record.event
                     RawEvents.DISCONNECTED -> {
                         connection = record.event
                         beats.restart()
+                        heartRateTrend.breakAt(record.monoNs)
+                        rrTrend.breakAt(record.monoNs)
                     }
                     RawEvents.BATTERY -> batteryPercentage = record.levelPct
                 }
                 is GapRecord -> {
                     gaps++
-                    if (record.stream == RawStreams.HR) beats.restart()
+                    if (record.stream == RawStreams.HR) {
+                        beats.restart()
+                        heartRateTrend.breakAt(record.fromMonoNs)
+                        rrTrend.breakAt(record.fromMonoNs)
+                    }
                 }
                 is EndRecord -> ended = true
             }
@@ -164,6 +183,8 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
         connection = connection,
         gaps = gaps,
         beats = beats.recent().asList(),
+        heartRateTrend = heartRateTrend.snapshot(),
+        rrTrend = rrTrend.snapshot(),
         unknownLines = unknownLines,
         malformedLines = malformedLines,
         ended = ended,
