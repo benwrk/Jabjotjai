@@ -45,7 +45,8 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
    the user stops it. Its notification shows the strap's heart rate, the connection, the gap
    count, the strap's battery and the time since the start, read by tailing the raw file like the
    monitor. It shows all of that on the lock screen, and while the heart rate is current its
-   status-bar icon is a heart with the heart rate in it.
+   status-bar icon is a heart with the heart rate in it. It asks to be shown as a Live Update,
+   with the heart rate as the status-bar chip where the phone draws one.
 5. **The layout adapts to orientation.** Landscape is the monitor layout, with waveforms on the
    left and numerics on the right; portrait stacks the numerics above the waveforms.
 

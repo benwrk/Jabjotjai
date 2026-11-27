@@ -291,7 +291,26 @@ class CaptureService : Service() {
             .setOngoing(true)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, getString(R.string.stop), stop).build())
+            .apply { requestLiveUpdate(this, content) }
             .build()
+    }
+
+    /**
+     * Asks for the notification to be a promoted ongoing one (a "Live Update"), which the system
+     * may show as a chip in the status bar; the chip's text is the heart rate, or, without one, the
+     * elapsed time. Whether it is promoted is the system's and the user's choice: meeting the
+     * requirements "does not guarantee" it (`Notification.hasPromotableCharacteristics`, SDK 37
+     * source, read 2026-11-27). The request needs Android 16 QPR2 (API 36.1), and the chip text
+     * API 36 (`api-versions.xml`, SDK 37).
+     *
+     * On the test phone (Galaxy S25, Android 17, One UI 9) the notification was promoted (its flags
+     * gained `PROMOTED_ONGOING`) and pinned to the top of the shade, but the status bar drew no chip
+     * (seen 2026-11-27).
+     */
+    private fun requestLiveUpdate(builder: Notification.Builder, content: NotificationContent) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return
+        builder.setShortCriticalText(content.bpm?.takeUnless { content.readFailed }?.let { getString(R.string.capture_notification_chip, it) })
+        if (Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) builder.setRequestPromotedOngoing(true)
     }
 
     companion object {

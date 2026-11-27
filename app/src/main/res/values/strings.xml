@@ -49,5 +49,6 @@
 
     <string name="capture_notification_hr">HR %1$d bpm</string>
     <string name="capture_notification_hr_none">HR —</string>
+    <string name="capture_notification_chip">HR %1$d</string>
     <string name="capture_notification_read_error">Cannot read the raw file</string>
 </resources>
