@@ -184,10 +184,12 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
     fun endEarlier(atNs: Long) = breakTrends(atNs)
 
     private fun appendTrends(record: HrRecord, shiftNs: Long) {
-        if (record.bpm > 0) heartRateTrend.append(record.monoNs + shiftNs, record.bpm)
+        // A strap that does not report contact at all is taken to have it.
+        val contact = record.contact || !record.contactSupported
+        if (record.bpm > 0) heartRateTrend.append(record.monoNs + shiftNs, record.bpm, contact)
         if (record.rrAvailable) {
             val ends = rrEndTimes(record.monoNs + shiftNs, record.rrMs)
-            record.rrMs.forEachIndexed { i, rr -> rrTrend.append(ends[i], rr) }
+            record.rrMs.forEachIndexed { i, rr -> rrTrend.append(ends[i], rr, contact) }
         }
     }
 

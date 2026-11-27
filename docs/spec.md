@@ -210,6 +210,20 @@ failed stream starting again on the strap (`docs/backlog.md`).
    and the nearest value with the time it was received, in the phone's time format, following the
    finger as it moves and gone when it lifts; where no value is near, only the time shows.
 
+## 0.8: the next version
+
+The current scope.
+
+1. **Artifacts no longer flatten the heart-rate and RR rows.** Three settings in the cog menu, all
+   on by default, change only what is drawn; the raw file keeps every value:
+   - the scale fits the middle 98% of the values, and a value beyond it is marked at its edge;
+   - values the strap sent without skin contact are left out; switched off, they are drawn dimmed,
+     and either way they do not set the scale;
+   - an RR interval longer than a chosen limit (none, 1,500, 2,000 or 3,000 ms; 2,000 by default)
+     does not set the scale either, and is marked at its top edge.
+
+   Holding a finger on a marked value reads its real value.
+
 ## Later
 
 Not scheduled. Each becomes a version when it is specified:

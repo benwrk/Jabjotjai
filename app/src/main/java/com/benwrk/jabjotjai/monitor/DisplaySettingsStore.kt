@@ -29,6 +29,11 @@ object DisplaySettingsStore {
     private const val TIME_FROM_START = "time_from_start"
     private const val CHART_ROWS = "chart_rows"
     private const val CHART_UNDER_CUTOUT = "chart_under_cutout"
+    private const val TREND_ROBUST_SCALE = "trend_robust_scale"
+    private const val TREND_HIDE_NO_CONTACT = "trend_hide_no_contact"
+
+    /** The longest RR an RR row scales to, in ms, with 0 for none. */
+    private const val RR_CEILING_MS = "rr_ceiling_ms"
 
     private val mutableSettings = MutableStateFlow(DisplaySettings())
     val settings: StateFlow<DisplaySettings> = mutableSettings.asStateFlow()
@@ -73,6 +78,13 @@ object DisplaySettingsStore {
             // Rows kept by 0.4 had the one sweep speed of their day.
             rows = prefs.getString(CHART_ROWS, null)?.let { decodeChartRows(it, legacySpeed = sweep) } ?: defaults.rows,
             chartUnderCutout = prefs.getBoolean(CHART_UNDER_CUTOUT, defaults.chartUnderCutout),
+            trendRobustScale = prefs.getBoolean(TREND_ROBUST_SCALE, defaults.trendRobustScale),
+            trendHideNoContact = prefs.getBoolean(TREND_HIDE_NO_CONTACT, defaults.trendHideNoContact),
+            rrCeilingMs = when (val kept = prefs.getInt(RR_CEILING_MS, defaults.rrCeilingMs ?: 0)) {
+                0 -> null
+                in RR_CEILINGS_MS -> kept
+                else -> defaults.rrCeilingMs
+            },
         )
     }
 
@@ -90,6 +102,9 @@ object DisplaySettingsStore {
                 .putBoolean(TIME_FROM_START, settings.timeFromStart)
                 .putString(CHART_ROWS, encodeChartRows(settings.rows))
                 .putBoolean(CHART_UNDER_CUTOUT, settings.chartUnderCutout)
+                .putBoolean(TREND_ROBUST_SCALE, settings.trendRobustScale)
+                .putBoolean(TREND_HIDE_NO_CONTACT, settings.trendHideNoContact)
+                .putInt(RR_CEILING_MS, settings.rrCeilingMs ?: 0)
         }
     }
 }

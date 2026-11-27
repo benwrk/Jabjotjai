@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.ChartGraph
 import com.benwrk.jabjotjai.monitor.Sweep
+import com.benwrk.jabjotjai.monitor.TrendFilter
 import com.benwrk.jabjotjai.monitor.TrendMotion
 import com.benwrk.jabjotjai.monitor.TrendSnapshot
 import com.benwrk.jabjotjai.monitor.nearestTrendPoint
@@ -48,7 +49,9 @@ import java.util.Date
  * at the right edge. A cascade is read as one strip: its scale covers what the whole strip shows,
  * rounded out to [step], so every graph of it reads alike; the scale's ends are written at the right.
  * Values join into a line, or with [dots] stand alone, one per beat; a line never crosses a break
- * (a gap or a disconnection) or [maxJoinNs] without a value.
+ * (a gap or a disconnection) or [maxJoinNs] without a value. [filter] decides which values set the
+ * scale and which are drawn: one beyond the scale is marked at its edge, and one sent without skin
+ * contact is drawn dimmed, if it is drawn at all.
  */
 @Composable
 fun TrendTrace(
@@ -60,6 +63,7 @@ fun TrendTrace(
     minRange: Int,
     dots: Boolean,
     maxJoinNs: Long,
+    filter: TrendFilter,
     modifier: Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -72,19 +76,24 @@ fun TrendTrace(
         val stripNs = rowNs * graph.cascadeSize
         val sweeping = graph.motion == TrendMotion.SWEEP
         val earliest = trendWindowStart(now, graph)
-        val range = trendRange(series, earliest, now, step, minRange) ?: return@Canvas
+        val range = trendRange(series, earliest, now, step, minRange, filter) ?: return@Canvas
         val (low, high) = range
 
         val path = Path()
+        // Line segments ending at a value sent without skin contact, drawn dimmed.
+        val dimPath = Path()
+        val dim = color.copy(alpha = NO_CONTACT_ALPHA)
         val dotRadius = 1.5.dp.toPx()
+        val marker = 3.dp.toPx()
         for (points in series) {
             var drawing = false
             var lastX = 0f
+            var lastY = 0f
             var lastT = Long.MIN_VALUE
             for (i in 0 until points.size) {
                 val t = points.tNs[i]
                 val value = points.values[i]
-                if (t !in (earliest + 1)..now || value == TrendSnapshot.BREAK) {
+                if (t !in (earliest + 1)..now || !filter.shows(points, i)) {
                     drawing = false
                     continue
                 }
@@ -96,19 +105,45 @@ fun TrendTrace(
                     continue
                 }
                 val x = (along - row) * size.width
+                // Beyond the scale: a marker pinned at the edge it is beyond, in the clipped colour,
+                // so an outlier shows without setting the scale; a line breaks there.
+                if (value > high || value < low) {
+                    val edge = if (value > high) 0f else size.height
+                    val tip = if (value > high) marker else -marker
+                    val triangle = Path().apply {
+                        moveTo(x - marker, edge + tip)
+                        lineTo(x + marker, edge + tip)
+                        lineTo(x, edge)
+                        close()
+                    }
+                    drawPath(triangle, MonitorColors.Clipped)
+                    drawing = false
+                    continue
+                }
                 val y = size.height * (1f - (value - low).toFloat() / (high - low))
+                val shade = if (points.contact[i]) color else dim
                 if (dots) {
-                    drawCircle(color, dotRadius, Offset(x, y))
+                    drawCircle(shade, dotRadius, Offset(x, y))
                 } else {
                     // A wrap to the left edge, or too long without a value, starts a new line.
-                    if (drawing && x >= lastX && t - lastT <= maxJoinNs) path.lineTo(x, y) else path.moveTo(x, y)
+                    val joins = drawing && x >= lastX && t - lastT <= maxJoinNs
+                    val target = if (points.contact[i]) path else dimPath
+                    if (joins) {
+                        target.moveTo(lastX, lastY)
+                        target.lineTo(x, y)
+                    }
                     drawing = true
                 }
                 lastX = x
+                lastY = y
                 lastT = t
             }
         }
-        if (!dots) drawPath(path, color, style = Stroke(width = 1.5.dp.toPx(), join = StrokeJoin.Round, cap = StrokeCap.Round))
+        if (!dots) {
+            val stroke = Stroke(width = 1.5.dp.toPx(), join = StrokeJoin.Round, cap = StrokeCap.Round)
+            drawPath(dimPath, dim, style = stroke)
+            drawPath(path, color, style = stroke)
+        }
 
         val style = TextStyle(color = MonitorColors.Secondary, fontSize = 10.sp, fontFamily = MonitorMono)
         val top = textMeasurer.measure(high.toString(), style)
@@ -144,6 +179,7 @@ fun TrendReadout(
     nowMonoNs: State<Long>,
     graph: ChartGraph,
     unit: String,
+    filter: TrendFilter,
     wallMsAt: (Long) -> Long?,
     color: Color,
     modifier: Modifier = Modifier,
@@ -174,7 +210,7 @@ fun TrendReadout(
         val x = at.x.coerceIn(0f, size.width)
         val t = trendTimeAt(x / size.width, now, graph)
         val reachNs = (READOUT_REACH.toPx() / size.width * graph.span.ns).toLong()
-        val point = nearestTrendPoint(trends(), t, trendWindowStart(now, graph), now, reachNs)
+        val point = nearestTrendPoint(trends(), t, trendWindowStart(now, graph), now, reachNs, filter)
         drawLine(color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
 
         val time = wallMsAt(point?.tNs ?: t)?.let { timeFormat.format(Date(it)) } ?: return@Canvas
@@ -190,3 +226,6 @@ fun TrendReadout(
 
 /** How far either side of the finger a value is still read as the one under it. */
 private val READOUT_REACH = 12.dp
+
+/** How strongly a value sent without skin contact is drawn, against one sent with it. */
+private const val NO_CONTACT_ALPHA = 0.35f

@@ -62,6 +62,9 @@ class ScaleLadder(
  * @param timeFromStart the timeline's time counts from the capture's start rather than back from live
  * @param rows the chart's rows, top to bottom; see [chartGraphs]
  * @param chartUnderCutout the chart reaches under the camera cut-out, its labels kept clear of the camera
+ * @param trendRobustScale heart-rate and RR rows scale to their usual values (see [TrendFilter.robust])
+ * @param trendHideNoContact heart-rate and RR rows leave out values sent without skin contact
+ * @param rrCeilingMs RR rows count no longer interval than this towards their scale; null for no limit
  */
 data class DisplaySettings(
     val sweep: SweepSpeed = SweepSpeed.MM_25,
@@ -76,6 +79,9 @@ data class DisplaySettings(
     val timeFromStart: Boolean = false,
     val rows: List<ChartRow> = DEFAULT_CHART_ROWS,
     val chartUnderCutout: Boolean = false,
+    val trendRobustScale: Boolean = true,
+    val trendHideNoContact: Boolean = true,
+    val rrCeilingMs: Int? = DEFAULT_RR_CEILING_MS,
 )
 
 /** Where a band's middle line sits, in sample units, and which step of its ladder it draws at. */
@@ -87,3 +93,15 @@ data class BandScale(val index: Int, val centre: Int)
  * volume applies on top.
  */
 val DisplaySettings.beepGain: Float get() = beepVolume * beepVolume
+
+/** The longest RR interval an RR row counts towards its scale, unless set otherwise: 30 a minute. */
+const val DEFAULT_RR_CEILING_MS = 2_000
+
+/** The longest RR intervals the display settings offer, besides none. */
+val RR_CEILINGS_MS = listOf(1_500, 2_000, 3_000)
+
+/** How the heart-rate rows treat values that would mislead them; heart rate has no ceiling. */
+val DisplaySettings.heartRateFilter: TrendFilter get() = TrendFilter(trendRobustScale, trendHideNoContact)
+
+/** How the RR rows treat values that would mislead them. */
+val DisplaySettings.rrFilter: TrendFilter get() = TrendFilter(trendRobustScale, trendHideNoContact, rrCeilingMs)

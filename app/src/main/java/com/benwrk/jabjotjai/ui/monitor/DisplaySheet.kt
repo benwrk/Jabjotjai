@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.DisplaySettings
+import com.benwrk.jabjotjai.monitor.RR_CEILINGS_MS
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import java.math.BigDecimal
@@ -98,6 +99,34 @@ fun DisplaySheet(
                 checked = settings.chartUnderCutout,
                 onCheckedChange = { under -> onChange { it.copy(chartUnderCutout = under) } },
             )
+
+            // How the heart-rate and RR rows treat values that would mislead them; the raw file keeps all.
+            Toggle(
+                title = stringResource(R.string.display_trend_robust),
+                hint = stringResource(R.string.display_trend_robust_hint),
+                checked = settings.trendRobustScale,
+                onCheckedChange = { robust -> onChange { it.copy(trendRobustScale = robust) } },
+            )
+            Toggle(
+                title = stringResource(R.string.display_trend_no_contact),
+                hint = stringResource(R.string.display_trend_no_contact_hint),
+                checked = settings.trendHideNoContact,
+                onCheckedChange = { hide -> onChange { it.copy(trendHideNoContact = hide) } },
+            )
+            Choices(stringResource(R.string.display_rr_ceiling)) {
+                FilterChip(
+                    selected = settings.rrCeilingMs == null,
+                    onClick = { onChange { it.copy(rrCeilingMs = null) } },
+                    label = { Text(stringResource(R.string.display_rr_ceiling_none)) },
+                )
+                for (ceiling in RR_CEILINGS_MS) {
+                    FilterChip(
+                        selected = settings.rrCeilingMs == ceiling,
+                        onClick = { onChange { it.copy(rrCeilingMs = ceiling) } },
+                        label = { Text(stringResource(R.string.display_rr_ceiling_ms, ceiling)) },
+                    )
+                }
+            }
 
             // The beep itself is switched on and its volume set on the playback bar.
             Toggle(

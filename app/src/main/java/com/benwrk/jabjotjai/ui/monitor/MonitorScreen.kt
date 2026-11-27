@@ -82,9 +82,12 @@ import com.benwrk.jabjotjai.monitor.RowSignal
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.SweepSpeed
 import com.benwrk.jabjotjai.monitor.TraceSnapshot
+import com.benwrk.jabjotjai.monitor.TrendFilter
 import com.benwrk.jabjotjai.monitor.TrendSnapshot
 import com.benwrk.jabjotjai.monitor.chartGraphs
+import com.benwrk.jabjotjai.monitor.heartRateFilter
 import com.benwrk.jabjotjai.monitor.positionNs
+import com.benwrk.jabjotjai.monitor.rrFilter
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import com.benwrk.jabjotjai.ui.theme.MonitorMono
 import kotlinx.coroutines.delay
@@ -261,11 +264,11 @@ private fun Waveforms(bands: Bands, modifier: Modifier) {
             when (graph.signal) {
                 RowSignal.ECG -> EcgBand(bands, graph, graphModifier)
                 RowSignal.HR -> TrendBand(
-                    stringResource(R.string.monitor_hr_trend, graph.span.minutes), stringResource(R.string.monitor_bpm), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.heartRate, bands.trends.value.heartRateTrend) }, bands, graph,
+                    stringResource(R.string.monitor_hr_trend, graph.span.minutes), stringResource(R.string.monitor_bpm), bands.settings.value.heartRateFilter, { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.heartRate, bands.trends.value.heartRateTrend) }, bands, graph,
                     MonitorColors.Ecg, step = 10, minRange = 40, dots = false, graphModifier,
                 )
                 RowSignal.RR -> TrendBand(
-                    stringResource(R.string.monitor_rr_trend, graph.span.minutes), stringResource(R.string.monitor_ms), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.rr, bands.trends.value.rrTrend) }, bands, graph,
+                    stringResource(R.string.monitor_rr_trend, graph.span.minutes), stringResource(R.string.monitor_ms), bands.settings.value.rrFilter, { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.rr, bands.trends.value.rrTrend) }, bands, graph,
                     MonitorColors.Text, step = 100, minRange = 400, dots = true, graphModifier,
                 )
                 RowSignal.ACC -> AccBand(bands, ACC_AXES, bands.scales.getValue(RowSignal.ACC), graph, graphModifier)
@@ -550,6 +553,7 @@ private fun rememberPxPerMm(): Float {
 private fun TrendBand(
     label: String,
     unit: String,
+    filter: TrendFilter,
     trends: () -> List<TrendSnapshot>,
     bands: Bands,
     graph: ChartGraph,
@@ -561,13 +565,14 @@ private fun TrendBand(
 ) {
     Band(label = { if (graph.cascadeIndex == 0) Text(label, color = color, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
         Box(Modifier.fillMaxSize()) {
-            TrendTrace(trends, bands.frameClock, graph, color, step, minRange, dots, maxJoinNs = TREND_JOIN_NS, modifier = Modifier.fillMaxSize())
+            TrendTrace(trends, bands.frameClock, graph, color, step, minRange, dots, maxJoinNs = TREND_JOIN_NS, filter = filter, modifier = Modifier.fillMaxSize())
             if (graph.cascadeIndex == 0) EarlierTrendsNote(bands.earlier.value, color)
             TrendReadout(
                 trends,
                 bands.frameClock,
                 graph,
                 unit,
+                filter,
                 wallMsAt = { monoNs -> bands.trends.value.header?.start?.let { it.wallMs + (monoNs - it.monoNs) / 1_000_000 } },
                 color = color,
                 modifier = Modifier.fillMaxSize(),
