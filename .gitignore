@@ -21,3 +21,8 @@ local.properties
 
 # Kotlin compiler session files, written by every build.
 .kotlin/
+
+# Signing keystores. Every build is signed with one stable key (decision 0010), which lives outside
+# the tree; one must never be committed, not even by accident.
+*.jks
+*.keystore
