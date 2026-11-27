@@ -54,6 +54,8 @@ fun DisplaySheet(
 ) {
     // Fully open at once: half open, a landscape phone shows only the first row or two.
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        // The sheet has a window of its own, which would bring the status bar back over the monitor.
+        HideStatusBar()
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -150,7 +152,10 @@ fun DisplaySheet(
                 AlertDialog(
                     onDismissRequest = { askingToRestore = false },
                     title = { Text(stringResource(R.string.display_restore_title)) },
-                    text = { Text(stringResource(R.string.display_restore_body)) },
+                    text = {
+                        HideStatusBar()
+                        Text(stringResource(R.string.display_restore_body))
+                    },
                     confirmButton = {
                         TextButton(onClick = {
                             askingToRestore = false

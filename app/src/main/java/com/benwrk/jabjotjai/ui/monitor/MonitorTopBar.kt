@@ -450,7 +450,11 @@ private fun StopButton(onStop: () -> Unit) {
         AlertDialog(
             onDismissRequest = close,
             title = { Text(stringResource(R.string.monitor_stop_title)) },
-            text = { Text(stringResource(R.string.monitor_stop_body)) },
+            text = {
+                // The question has a window of its own, which would bring the status bar back.
+                HideStatusBar()
+                Text(stringResource(R.string.monitor_stop_body))
+            },
             confirmButton = {
                 TextButton(onClick = {
                     close()

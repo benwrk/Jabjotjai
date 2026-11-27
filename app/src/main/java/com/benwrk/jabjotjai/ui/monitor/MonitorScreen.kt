@@ -61,6 +61,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -497,17 +498,24 @@ private fun KeepScreenOn() {
 /**
  * Hides the system status bar while the monitor is on screen, so the traces get its height; the
  * top bar shows the time and battery instead. A swipe from the top edge shows it for a moment.
+ *
+ * Called inside a dialog or a sheet, which has a window of its own, it hides the bar in that
+ * window: Material 3's sheet otherwise keeps the system bars visible for its window
+ * (`ModalBottomSheet.android.kt`, material3 1.5.0 source), which brought the bar back and moved the
+ * monitor down behind it. A dialog's window goes when the dialog closes, so the bar is not shown
+ * again for it.
  */
 @Composable
-private fun HideStatusBar() {
+internal fun HideStatusBar() {
     val view = LocalView.current
     DisposableEffect(view) {
-        val window = generateSequence(view.context) { (it as? ContextWrapper)?.baseContext }
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+        val window = dialogWindow ?: generateSequence(view.context) { (it as? ContextWrapper)?.baseContext }
             .filterIsInstance<Activity>().firstOrNull()?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        val controller = window?.let { WindowCompat.getInsetsController(it, if (dialogWindow != null) it.decorView else view) }
         controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller?.hide(WindowInsetsCompat.Type.statusBars())
-        onDispose { controller?.show(WindowInsetsCompat.Type.statusBars()) }
+        onDispose { if (dialogWindow == null) controller?.show(WindowInsetsCompat.Type.statusBars()) }
     }
 }
 
