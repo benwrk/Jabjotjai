@@ -16,11 +16,16 @@ import android.os.PowerManager
 import android.util.Log
 import com.benwrk.jabjotjai.MainActivity
 import com.benwrk.jabjotjai.R
+import com.benwrk.jabjotjai.monitor.DisplaySettingsStore
 import com.benwrk.jabjotjai.monitor.MonitorModel
+import com.benwrk.jabjotjai.monitor.beepAtBeats
+import com.benwrk.jabjotjai.raw.AccRecord
+import com.benwrk.jabjotjai.raw.EcgRecord
 import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.Phone
 import com.benwrk.jabjotjai.raw.RAW_SCHEMA
 import com.benwrk.jabjotjai.raw.RawEvents
+import com.benwrk.jabjotjai.raw.RawLine
 import com.benwrk.jabjotjai.raw.RawTail
 import com.benwrk.jabjotjai.raw.RawWriter
 import com.benwrk.jabjotjai.raw.Sensor
@@ -33,8 +38,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -58,11 +65,15 @@ class CaptureService : Service() {
     )
 
     /**
-     * Keeps the notification current, on the main thread. Separate from [scope] because a failure
-     * there must not end the capture, and [finish] cancels it before taking the notification down,
-     * so a late update cannot put it back.
+     * Everything that follows the capture rather than making it: the reader behind [Capture.live],
+     * the notification and the beat beep, on the main thread unless they move off it. Separate from
+     * [scope] because a failure here must not end the capture: it is logged, and the rest carries
+     * on. [finish] cancels it before taking the notification down, so a late update cannot put it
+     * back.
      */
-    private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val liveScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, error -> Log.e(TAG, "live reading failed", error) },
+    )
 
     // Touched only on the main thread.
     private var running = false
@@ -91,6 +102,7 @@ class CaptureService : Service() {
     private fun start(sensorId: String, sensorName: String, sensorAddress: String) {
         if (running) return
         running = true
+        DisplaySettingsStore.init(this)
         val clock = SystemPhoneClock
         val start = clock.stamp()
         startForeground(
@@ -111,7 +123,9 @@ class CaptureService : Service() {
             val newSession = CaptureSession(RawWriter.create(file, clock::monoNs))
             newSession.start(header)
             // The file exists from here on, which a tail needs.
-            notificationScope.launch { keepNotificationCurrent(file, sensorName, start.wallMs) }
+            liveScope.launch { readLive(file) }
+            liveScope.launch { keepNotificationCurrent(sensorName, start.wallMs) }
+            liveScope.launch { beepWhileWanted() }
             session = newSession
             link = PolarH10Link(api, sensorId, sensorAddress, newSession, clock, scope).also { it.connect() }
             Capture.publish(CaptureState.Running(file, sensorId, sensorName))
@@ -166,7 +180,9 @@ class CaptureService : Service() {
     }
 
     private fun finish() {
-        notificationScope.coroutineContext.cancelChildren()
+        liveScope.coroutineContext.cancelChildren()
+        Capture.publishLive(LiveReading.EMPTY)
+        Capture.publishBeepError(null)
         wakeLock?.takeIf { it.isHeld }?.release()
         wakeLock = null
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -174,7 +190,7 @@ class CaptureService : Service() {
     }
 
     override fun onDestroy() {
-        notificationScope.cancel()
+        liveScope.cancel()
         if (running) {
             // The system is destroying the service mid-capture: end the file properly before the
             // capture thread goes away.
@@ -203,43 +219,70 @@ class CaptureService : Service() {
     }
 
     /**
-     * Shows what the raw file says, the way the monitor does: by tailing it (`AGENTS.md`, "Live is
-     * a reader tailing the raw file"), so a capture that stops writing shows as one. It reads
-     * continuously, which keeps the connection and battery events from early in the file. The
-     * system "might drop updates" posted "many in less than one second"
-     * (developer.android.com/develop/ui/views/notifications/build-notification, read 2026-11-27),
-     * so it posts at most once a second, and only when the content has changed.
-     *
-     * While the screen is off, the heart rate is posted as no value: following it then would mean
-     * posting every second all night for nobody, and leaving the last value up would show a stale
-     * number on an always-on display and for a moment after the screen wakes. The rest changes
-     * rarely and is still posted.
+     * Reads the raw file from its first line, as it grows, and publishes what it has read as
+     * [Capture.live]: the one reader behind the notification, the beat beep, and the monitor's
+     * connection, heart rate, battery, gaps and beats (`AGENTS.md`, "Live is a reader tailing the
+     * raw file"). Reading the file, not the capture, means a capture that stops writing shows as
+     * one. Frames are not published one by one, since nothing that reads [Capture.live] draws them.
      */
-    private suspend fun keepNotificationCurrent(file: File, sensorName: String, startWallMs: Long) {
+    private suspend fun readLive(file: File) {
+        val model = MonitorModel(keepNs = 0)
+        Capture.publishLive(LiveReading.EMPTY)
+        try {
+            RawTail(file, pollIntervalMs = LIVE_TAIL_POLL_MS).lines().collect { line ->
+                model.accept(line)
+                val record = (line as? RawLine.Record)?.record
+                if (record !is EcgRecord && record !is AccRecord) Capture.publishLive(LiveReading(model.snapshot(), readError = null))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "cannot read the raw file", e)
+            Capture.publishLive(LiveReading(model.snapshot(), readError = e.message ?: e.toString()))
+        }
+    }
+
+    /**
+     * Keeps the notification showing [Capture.live]. The system "might drop updates" posted "many
+     * in less than one second" (developer.android.com/develop/ui/views/notifications/build-notification,
+     * read 2026-11-27), so it posts at most once a second, and only when the content has changed;
+     * see [NotificationContent.of] for what is left out while the screen is off.
+     */
+    private suspend fun keepNotificationCurrent(sensorName: String, startWallMs: Long) {
         val manager = getSystemService(NotificationManager::class.java)
         val power = getSystemService(PowerManager::class.java)
-        val model = MonitorModel(keepNs = 0)
-        var readFailed = false
-        coroutineScope {
-            launch {
-                try {
-                    RawTail(file, pollIntervalMs = NOTIFICATION_TAIL_POLL_MS).lines().collect(model::accept)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.e(TAG, "the notification cannot read the raw file", e)
-                    readFailed = true
-                }
+        var shown: NotificationContent? = null
+        while (true) {
+            val live = Capture.live.value
+            val content = NotificationContent.of(live.snapshot, SystemPhoneClock.monoNs(), live.readError != null, power.isInteractive)
+            if (content != shown && running) {
+                manager.notify(NOTIFICATION_ID, notification(sensorName, startWallMs, content))
+                shown = content
             }
-            var shown: NotificationContent? = null
-            while (true) {
-                val current = NotificationContent.of(model.snapshot(), SystemPhoneClock.monoNs(), readFailed)
-                val content = if (power.isInteractive) current else current.copy(bpm = null)
-                if (content != shown && running) {
-                    manager.notify(NOTIFICATION_ID, notification(sensorName, startWallMs, content))
-                    shown = content
-                }
-                delay(NOTIFICATION_UPDATE_MS)
+            delay(NOTIFICATION_UPDATE_MS)
+        }
+    }
+
+    /**
+     * Sounds the beat beep while the user wants it: with the beep on, while the monitor is on
+     * screen, and also when it is not if they chose to keep it going. It lives here rather than in
+     * the screen so that it can go on with the app in the background. Its calls block, so it runs
+     * off the main thread; any failure stops the beep, is shown on the monitor, and leaves the
+     * capture alone.
+     */
+    private suspend fun beepWhileWanted() {
+        combine(DisplaySettingsStore.settings, Capture.monitorVisible) { settings, visible ->
+            settings.beep && (visible || settings.beepInBackground)
+        }.distinctUntilChanged().collectLatest { wanted ->
+            Capture.publishBeepError(null)
+            if (!wanted) return@collectLatest
+            try {
+                withContext(Dispatchers.IO) { beepAtBeats { Capture.live.value.snapshot.beats } }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "the beat beep stopped", e)
+                Capture.publishBeepError(e.message ?: e.toString())
             }
         }
     }
@@ -304,7 +347,8 @@ class CaptureService : Service() {
      * API 36 (`api-versions.xml`, SDK 37).
      *
      * On the test phone (Galaxy S25, Android 17, One UI 9) the notification was promoted (its flags
-     * gained `PROMOTED_ONGOING`) and pinned to the top of the shade, but the status bar drew no chip
+     * gained `PROMOTED_ONGOING`) and shown in the shade open, with its Stop action, where without
+     * promotion it was folded to one line; it was not always first, and the status bar drew no chip
      * (seen 2026-11-27).
      */
     private fun requestLiveUpdate(builder: Notification.Builder, content: NotificationContent) {
@@ -325,8 +369,11 @@ class CaptureService : Service() {
         private const val SYNC_TICK_MS = 1_000L
         private const val NOTIFICATION_UPDATE_MS = 1_000L
 
-        /** Slower than the monitor's tail: the notification changes at most once a second. */
-        private const val NOTIFICATION_TAIL_POLL_MS = 250L
+        /**
+         * How often the live reader looks for new lines. A beat reported after its slot is sounded
+         * when read, and is passed over if read more than 150 ms late, so this stays well under that.
+         */
+        private const val LIVE_TAIL_POLL_MS = 50L
 
         /** Raw files live in `files/raw/` (`docs/raw-format.md`). */
         const val RAW_DIRECTORY = "raw"

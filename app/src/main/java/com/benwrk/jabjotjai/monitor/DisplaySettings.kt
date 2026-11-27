@@ -51,11 +51,13 @@ class ScaleLadder(
 }
 
 /**
- * How the monitor draws, as the user set it. A fixed scale draws a band's zero in its middle; an
- * automatic one also moves the band to follow the trace (see [AutoScale]).
+ * How the monitor draws and sounds, as the user set it. A fixed scale draws a band's zero in its
+ * middle; an automatic one also moves the band to follow the trace (see [AutoScale]).
  *
  * @param ecgGainIndex the ECG step, in [ScaleLadder.ECG], used while [ecgAuto] is off
  * @param accScaleIndex the accelerometer step, in [ScaleLadder.ACC], used while [accAuto] is off
+ * @param beep a beep at each beat while the monitor is on screen
+ * @param beepInBackground with [beep], keep beeping while the monitor is not on screen as well
  */
 data class DisplaySettings(
     val sweep: SweepSpeed = SweepSpeed.MM_25,
@@ -65,6 +67,7 @@ data class DisplaySettings(
     val accScaleIndex: Int = ScaleLadder.ACC.standardIndex,
     val calibrationPulse: Boolean = true,
     val beep: Boolean = false,
+    val beepInBackground: Boolean = false,
 )
 
 /** Where a band's middle line sits, in sample units, and which step of its ladder it draws at. */

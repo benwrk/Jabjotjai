@@ -7,9 +7,9 @@ import com.benwrk.jabjotjai.monitor.currentHeartRate
  * What the capture notification says, taken from the raw file as read so far. Equal contents mean
  * the notification need not be posted again.
  *
- * @param bpm the strap's heart rate, or null if there is none or it is stale
+ * @param bpm the strap's heart rate, or null if there is none, it is stale, or the screen is off
  * @param connection the last connection event, one of the `RawEvents` connection values, or null
- * @param readFailed the notification's own reader could not read the file
+ * @param readFailed the reader could not read the file
  */
 data class NotificationContent(
     val bpm: Int?,
@@ -22,8 +22,14 @@ data class NotificationContent(
         /** Before anything has been read. */
         val STARTING = NotificationContent(bpm = null, connection = null, gaps = 0, batteryPct = null, readFailed = false)
 
-        fun of(snapshot: MonitorSnapshot, nowMonoNs: Long, readFailed: Boolean) = NotificationContent(
-            bpm = snapshot.currentHeartRate(nowMonoNs)?.bpm,
+        /**
+         * While the screen is off, the heart rate is left out. It changes every second, so
+         * following it would mean posting every second all night for nobody, and a heart rate left
+         * up would show a stale number on an always-on display and for a moment after the screen
+         * wakes. The rest changes rarely and is kept.
+         */
+        fun of(snapshot: MonitorSnapshot, nowMonoNs: Long, readFailed: Boolean, screenOn: Boolean) = NotificationContent(
+            bpm = snapshot.currentHeartRate(nowMonoNs)?.bpm?.takeIf { screenOn },
             connection = snapshot.connection,
             gaps = snapshot.gaps,
             batteryPct = snapshot.batteryPct,

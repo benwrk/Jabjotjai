@@ -1,4 +1,4 @@
-package com.benwrk.jabjotjai.ui.monitor
+package com.benwrk.jabjotjai.monitor
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -50,14 +50,23 @@ class BeatBeeper : AutoCloseable {
         .build()
         .also { it.write(TONE, 0, TONE.size) }
 
-    /** Plays the tone from its start, cutting off the previous one if it is still sounding. */
+    private var reportedSlow = false
+
+    /**
+     * Plays the tone from its start, cutting off the previous one if it is still sounding. The first
+     * beep that is slow to start is logged; on the test phone every one took 72 to 86 ms
+     * (2026-11-27), so logging each would fill the log all night.
+     */
     fun beep() {
         val startNs = SystemClock.elapsedRealtimeNanos()
         if (track.playState != AudioTrack.PLAYSTATE_STOPPED) track.stop()
         track.reloadStaticData()
         track.play()
         val tookMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000
-        if (tookMs > SLOW_BEEP_MS) Log.w(TAG, "starting a beep took $tookMs ms, so it sounded at least that late")
+        if (tookMs > SLOW_BEEP_MS && !reportedSlow) {
+            reportedSlow = true
+            Log.w(TAG, "starting a beep took $tookMs ms, so it sounded at least that late; later slow beeps are not logged")
+        }
     }
 
     override fun close() {

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.benwrk.jabjotjai.capture.Capture
 import com.benwrk.jabjotjai.capture.CaptureState
+import com.benwrk.jabjotjai.capture.LiveReading
 import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.RawTail
 import kotlinx.coroutines.CancellationException
@@ -22,29 +23,33 @@ import java.io.File
 import java.io.IOException
 
 /**
- * Feeds the monitor screen by tailing the raw file of the running capture. It never receives
- * data from the capture directly: the file is the only source (`AGENTS.md`, "Live is a reader
- * tailing the raw file").
+ * Feeds the monitor screen from the raw file of the running capture. It never receives data from
+ * the capture directly: the file is the only source (`AGENTS.md`, "Live is a reader tailing the
+ * raw file").
+ *
+ * The waveforms come from its own tail, which starts near the end of the file so a sweep fills at
+ * once. Everything that depends on the whole file (connection, heart rate, battery, gaps, beats)
+ * comes from [Capture.live], read from the first line by the capture service: a tail that starts
+ * near the end has not seen the connection event, and would count only the gaps after it.
  */
 class MonitorViewModel(application: Application) : AndroidViewModel(application) {
 
     private val mutableSnapshot = MutableStateFlow(MonitorSnapshot.EMPTY)
+
+    /** The waveforms and their timing; read the rest from [live]. */
     val snapshot: StateFlow<MonitorSnapshot> = mutableSnapshot.asStateFlow()
+
+    val live: StateFlow<LiveReading> = Capture.live
 
     private val mutableReadError = MutableStateFlow<String?>(null)
     val readError: StateFlow<String?> = mutableReadError.asStateFlow()
 
-    private val settingsStore = DisplaySettingsStore(application)
-    private val mutableDisplaySettings = MutableStateFlow(settingsStore.load())
-    val displaySettings: StateFlow<DisplaySettings> = mutableDisplaySettings.asStateFlow()
+    val displaySettings: StateFlow<DisplaySettings> = DisplaySettingsStore.settings
 
-    fun updateDisplaySettings(change: (DisplaySettings) -> DisplaySettings) {
-        val updated = change(mutableDisplaySettings.value)
-        mutableDisplaySettings.value = updated
-        settingsStore.save(updated)
-    }
+    fun updateDisplaySettings(change: (DisplaySettings) -> DisplaySettings) = DisplaySettingsStore.update(change)
 
     init {
+        DisplaySettingsStore.init(application)
         viewModelScope.launch {
             Capture.state
                 .map { (it as? CaptureState.Running)?.file }

@@ -19,6 +19,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.benwrk.jabjotjai.R
@@ -106,18 +107,26 @@ fun DisplaySheet(
                 checked = settings.beep,
                 onCheckedChange = { beep -> onChange { it.copy(beep = beep) } },
             )
+
+            Toggle(
+                title = stringResource(R.string.display_beep_background),
+                hint = stringResource(R.string.display_beep_background_hint),
+                checked = settings.beepInBackground,
+                enabled = settings.beep,
+                onCheckedChange = { keep -> onChange { it.copy(beepInBackground = keep) } },
+            )
         }
     }
 }
 
 @Composable
-private fun Toggle(title: String, hint: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun Toggle(title: String, hint: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = if (enabled) Color.Unspecified else MonitorColors.Secondary)
             Text(hint, color = MonitorColors.Secondary, style = MaterialTheme.typography.bodySmall)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 

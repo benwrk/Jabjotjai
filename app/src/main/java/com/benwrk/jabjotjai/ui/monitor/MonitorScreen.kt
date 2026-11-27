@@ -57,7 +57,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.benwrk.jabjotjai.R
+import com.benwrk.jabjotjai.capture.Capture
 import com.benwrk.jabjotjai.capture.CaptureState
+import com.benwrk.jabjotjai.capture.LiveReading
 import com.benwrk.jabjotjai.monitor.AutoScale
 import com.benwrk.jabjotjai.monitor.BandScale
 import com.benwrk.jabjotjai.monitor.DisplaySettings
@@ -67,7 +69,8 @@ import com.benwrk.jabjotjai.monitor.MonitorViewModel
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.TraceSnapshot
 import com.benwrk.jabjotjai.monitor.currentHeartRate
-import com.benwrk.jabjotjai.raw.HeaderRecord
+import com.benwrk.jabjotjai.monitor.elapsedSeconds
+import com.benwrk.jabjotjai.monitor.elapsedText
 import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import kotlinx.coroutines.delay
@@ -91,9 +94,13 @@ fun MonitorScreen(
     modifier: Modifier = Modifier,
 ) {
     KeepScreenOn()
+    ReportMonitorVisible()
     val snapshot = viewModel.snapshot.collectAsState()
+    val live = viewModel.live.collectAsState()
     val readError by viewModel.readError.collectAsState()
+    val beepError by Capture.beepError.collectAsState()
     val settings = viewModel.displaySettings.collectAsState()
+    MediaVolumeKeys(enabled = settings.value.beep)
     val frameClock = rememberFrameClock()
     val secondsClock = rememberSecondsClock()
     val pxPerMm = rememberPxPerMm()
@@ -106,8 +113,6 @@ fun MonitorScreen(
     val accScale = rememberBandScale(snapshot, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, accBandMm) {
         listOf(it.accX, it.accY, it.accZ)
     }
-    var beepError by remember { mutableStateOf<String?>(null) }
-    BeatBeeps(snapshot, settings.value.beep, onUnavailable = { beepError = it })
     var showDisplaySheet by rememberSaveable { mutableStateOf(false) }
 
     // Every argument is a remembered state object, so one holder serves for as long as the scale holds.
@@ -116,8 +121,8 @@ fun MonitorScreen(
         val landscape = maxWidth > maxHeight
         val numericsWidth = maxWidth * 0.26f
         Column(Modifier.fillMaxSize()) {
-            StatusBar(snapshot.value, running, secondsClock.value, onDisplay = { showDisplaySheet = true }, onStop)
-            readError?.let {
+            StatusBar(live.value.snapshot, running, secondsClock.value, onDisplay = { showDisplaySheet = true }, onStop)
+            (readError ?: live.value.readError)?.let {
                 Text(
                     stringResource(R.string.monitor_read_error, it),
                     color = MonitorColors.Alarm,
@@ -127,10 +132,10 @@ fun MonitorScreen(
             if (landscape) {
                 Row(Modifier.fillMaxSize()) {
                     Waveforms(bands, Modifier.weight(1f).fillMaxHeight())
-                    Numerics(snapshot, frameClock, secondsClock.value, beepError, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
+                    Numerics(live, frameClock, secondsClock.value, beepError, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
                 }
             } else {
-                Numerics(snapshot, frameClock, secondsClock.value, beepError, vertical = false, Modifier.fillMaxWidth())
+                Numerics(live, frameClock, secondsClock.value, beepError, vertical = false, Modifier.fillMaxWidth())
                 Waveforms(bands, Modifier.weight(1f).fillMaxWidth())
             }
         }
@@ -176,7 +181,7 @@ private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, 
     ) {
         Text(running.sensorName, color = MonitorColors.Text, style = MaterialTheme.typography.titleSmall)
         Text(connection, color = connectionColor, style = MaterialTheme.typography.titleSmall)
-        Text(elapsed(snapshot.header, nowMonoNs), color = MonitorColors.Secondary, fontFamily = FontFamily.Monospace)
+        Text(elapsedText(snapshot.elapsedSeconds(nowMonoNs) ?: 0), color = MonitorColors.Secondary, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.weight(1f))
         TextButton(onClick = onDisplay) { Text(stringResource(R.string.display_open), color = MonitorColors.Text) }
         OutlinedButton(onClick = onStop, border = BorderStroke(1.dp, MonitorColors.Alarm)) {
@@ -323,31 +328,34 @@ private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
     }
 }
 
+/** Heart rate, contact, battery and gaps, all from [Capture.live]: read from the file's first line. */
 @Composable
 private fun Numerics(
-    snapshot: State<MonitorSnapshot>,
+    live: State<LiveReading>,
     frameClock: State<Long>,
     nowMonoNs: Long,
     beepError: String?,
     vertical: Boolean,
     modifier: Modifier,
 ) {
-    val heartRate = snapshot.value.currentHeartRate(nowMonoNs)
+    val snapshot = live.value.snapshot
+    val heartRate = snapshot.currentHeartRate(nowMonoNs)
+    val beats = { live.value.snapshot.beats }
     if (vertical) {
         Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            HeartRateNumeric(heartRate, snapshot, frameClock)
-            Details(heartRate, snapshot.value, beepError)
+            HeartRateNumeric(heartRate, beats, frameClock)
+            Details(heartRate, snapshot, beepError)
         }
     } else {
         Row(modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Bottom) {
-            HeartRateNumeric(heartRate, snapshot, frameClock)
-            Details(heartRate, snapshot.value, beepError)
+            HeartRateNumeric(heartRate, beats, frameClock)
+            Details(heartRate, snapshot, beepError)
         }
     }
 }
 
 @Composable
-private fun HeartRateNumeric(heartRate: HeartRate?, snapshot: State<MonitorSnapshot>, frameClock: State<Long>) {
+private fun HeartRateNumeric(heartRate: HeartRate?, beats: () -> List<Long>, frameClock: State<Long>) {
     Column {
         Text(stringResource(R.string.monitor_hr), color = MonitorColors.Ecg, style = MaterialTheme.typography.titleMedium)
         Row {
@@ -358,7 +366,7 @@ private fun HeartRateNumeric(heartRate: HeartRate?, snapshot: State<MonitorSnaps
                 lineHeight = 72.sp,
                 fontWeight = FontWeight.Light,
             )
-            BeatHeart(snapshot, frameClock, Modifier.padding(start = 6.dp, top = 12.dp).size(24.dp))
+            BeatHeart(beats, frameClock, Modifier.padding(start = 6.dp, top = 12.dp).size(24.dp))
         }
         Text(stringResource(R.string.monitor_bpm), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelMedium)
     }
@@ -418,13 +426,6 @@ private val BandScaleSaver = listSaver<BandScale, Int>(
     save = { listOf(it.index, it.centre) },
     restore = { BandScale(index = it[0], centre = it[1]) },
 )
-
-/** Time since the capture started, from the header's monotonic stamp, as `h:mm:ss`. */
-private fun elapsed(header: HeaderRecord?, nowMonoNs: Long): String {
-    val start = header?.start?.monoNs ?: return "0:00:00"
-    val seconds = ((nowMonoNs - start) / 1_000_000_000L).coerceAtLeast(0)
-    return "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
-}
 
 @Composable
 private fun KeepScreenOn() {

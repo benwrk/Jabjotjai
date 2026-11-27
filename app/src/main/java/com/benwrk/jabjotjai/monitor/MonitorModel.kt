@@ -221,3 +221,10 @@ internal class SampleSeries(initialCapacity: Int = 1024) {
         end = count
     }
 }
+
+/** Time since the capture started, from the header's monotonic stamp, in whole seconds; null before the header is read. */
+fun MonitorSnapshot.elapsedSeconds(nowMonoNs: Long): Long? =
+    header?.let { ((nowMonoNs - it.start.monoNs) / 1_000_000_000L).coerceAtLeast(0) }
+
+/** [seconds] as `h:mm:ss`. */
+fun elapsedText(seconds: Long): String = "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)

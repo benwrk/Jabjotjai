@@ -48,6 +48,8 @@
     <string name="display_pulse_hint">A 1 mV pulse at the left of the ECG, rising from the line where the trace draws 0 mV.</string>
     <string name="display_beep">Beat beep</string>
     <string name="display_beep_hint">One beep for each beat the strap reports, while this screen is on. It follows the media volume.</string>
+    <string name="display_beep_background">Keep beeping in the background</string>
+    <string name="display_beep_background_hint">Go on beeping when the app is not on screen, with the screen off too, until the capture stops. Uses more battery.</string>
 
     <string name="capture_notification_hr">HR %1$d bpm</string>
     <string name="capture_notification_hr_none">HR —</string>

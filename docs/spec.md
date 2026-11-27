@@ -32,16 +32,21 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
      the band to keep the trace in its middle. The label always states the step in use, and the
      1 mV calibration pulse follows the gain and the speed, rising from the line where the trace
      draws 0 mV over the left of the trace; it is shown by default and can be hidden;
-   - a beep at each beat the strap reports, off by default. It sounds only while the monitor is
-     on screen, follows the media volume, never interrupts other audio and never appears as media
-     playing (decision `0009`).
+   - a beep at each beat the strap reports, off by default. It sounds while the monitor is on
+     screen and, if the user also turns that on, in the background until the capture stops. It
+     follows the media volume, never interrupts other audio and never appears as media playing
+     (decision `0009`).
 
    A stretch of trace beyond the edge of its band is drawn on the edge and marked as clipped, so
    a peak the display cut off cannot pass for the shape of the wave.
 3. **The display reads the raw file.** The connection writes everything the strap sends to an
    append-only raw file (schema 1.0, `docs/raw-format.md`), and the monitor draws by tailing that
    file, so what is shown is exactly what is stored (`AGENTS.md`, "Live is a reader tailing the
-   raw file"). The files are kept. There is no recording feature yet: no session list, no export.
+   raw file"). The waveforms are read from near the end of the file, so a sweep fills at once;
+   connection, heart rate, battery, gaps and beats come from one reader that starts at the file's
+   first line, shared by the monitor, the notification and the beep, so all three agree whenever
+   they start looking. The files are kept. There is no recording feature yet: no session list, no
+   export.
 4. **The connection stays up when the app is in the background**, in a foreground service, until
    the user stops it. Its notification shows the strap's heart rate, the connection, the gap
    count, the strap's battery and the time since the start, read by tailing the raw file like the

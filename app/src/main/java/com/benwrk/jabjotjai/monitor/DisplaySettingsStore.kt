@@ -1,17 +1,52 @@
 package com.benwrk.jabjotjai.monitor
 
 import android.content.Context
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Keeps [DisplaySettings] between runs. They describe only how the screen draws, never what is
- * recorded, so they live in shared preferences rather than in the raw file.
+ * Keeps [DisplaySettings] between runs. They describe only how the screen draws and sounds, never
+ * what is recorded, so they live in shared preferences rather than in the raw file.
+ *
+ * One copy is shared by the whole process, because the capture service needs them as well as the
+ * screen: it is the one that beeps. Call [init] before reading [settings].
  */
-class DisplaySettingsStore(context: Context) {
+object DisplaySettingsStore {
 
-    private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    private const val FILE = "display"
+    private const val SWEEP = "sweep"
+    private const val ECG_AUTO = "ecg_auto"
+    private const val ECG_GAIN = "ecg_gain_index"
+    private const val ACC_AUTO = "acc_auto"
+    private const val ACC_SCALE = "acc_scale_index"
+    private const val CALIBRATION_PULSE = "calibration_pulse"
+    private const val BEEP = "beep"
+    private const val BEEP_IN_BACKGROUND = "beep_in_background"
+
+    private val mutableSettings = MutableStateFlow(DisplaySettings())
+    val settings: StateFlow<DisplaySettings> = mutableSettings.asStateFlow()
+
+    private var context: Context? = null
+
+    /** Loads the saved settings, once per process; later calls do nothing. */
+    @Synchronized
+    fun init(context: Context) {
+        if (this.context != null) return
+        this.context = context.applicationContext
+        mutableSettings.value = load(context.applicationContext)
+    }
+
+    @Synchronized
+    fun update(change: (DisplaySettings) -> DisplaySettings) {
+        val updated = change(mutableSettings.value)
+        mutableSettings.value = updated
+        context?.let { save(it, updated) }
+    }
 
     /** The saved settings; anything missing or no longer valid falls back to its default. */
-    fun load(): DisplaySettings {
+    private fun load(context: Context): DisplaySettings {
+        val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         val defaults = DisplaySettings()
         return DisplaySettings(
             sweep = SweepSpeed.entries.firstOrNull { it.name == prefs.getString(SWEEP, null) } ?: defaults.sweep,
@@ -21,11 +56,12 @@ class DisplaySettingsStore(context: Context) {
             accScaleIndex = prefs.getInt(ACC_SCALE, defaults.accScaleIndex).takeIf { it in 0 until ScaleLadder.ACC.size } ?: defaults.accScaleIndex,
             calibrationPulse = prefs.getBoolean(CALIBRATION_PULSE, defaults.calibrationPulse),
             beep = prefs.getBoolean(BEEP, defaults.beep),
+            beepInBackground = prefs.getBoolean(BEEP_IN_BACKGROUND, defaults.beepInBackground),
         )
     }
 
-    fun save(settings: DisplaySettings) {
-        prefs.edit()
+    private fun save(context: Context, settings: DisplaySettings) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString(SWEEP, settings.sweep.name)
             .putBoolean(ECG_AUTO, settings.ecgAuto)
             .putInt(ECG_GAIN, settings.ecgGainIndex)
@@ -33,17 +69,7 @@ class DisplaySettingsStore(context: Context) {
             .putInt(ACC_SCALE, settings.accScaleIndex)
             .putBoolean(CALIBRATION_PULSE, settings.calibrationPulse)
             .putBoolean(BEEP, settings.beep)
+            .putBoolean(BEEP_IN_BACKGROUND, settings.beepInBackground)
             .apply()
-    }
-
-    private companion object {
-        const val FILE = "display"
-        const val SWEEP = "sweep"
-        const val ECG_AUTO = "ecg_auto"
-        const val ECG_GAIN = "ecg_gain_index"
-        const val ACC_AUTO = "acc_auto"
-        const val ACC_SCALE = "acc_scale_index"
-        const val CALIBRATION_PULSE = "calibration_pulse"
-        const val BEEP = "beep"
     }
 }
