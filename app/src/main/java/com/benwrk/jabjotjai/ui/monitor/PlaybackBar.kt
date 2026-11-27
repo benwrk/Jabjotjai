@@ -63,12 +63,14 @@ import com.benwrk.jabjotjai.ui.theme.MonitorColors
  * to nothing mutes it. The cog opens the display settings.
  *
  * @param startNs the capture's start, or null until its header has been read
+ * @param sessionSeconds how long the capture has run, shown under the playhead's time
  */
 @Composable
 fun PlaybackBar(
     playback: Playback,
     startNs: Long?,
     nowNs: Long,
+    sessionSeconds: Long?,
     settings: DisplaySettings,
     onSettings: ((DisplaySettings) -> DisplaySettings) -> Unit,
     onTogglePause: () -> Unit,
@@ -119,17 +121,22 @@ fun PlaybackBar(
                 } else {
                     stringResource(R.string.playback_behind, elapsedText(((1f - fraction) * lengthNs).toLong() / 1_000_000_000L))
                 }
-                Text(
-                    time,
-                    color = MonitorColors.Secondary,
-                    fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier
+                // The playhead's time, and under it how long the capture has run.
+                Column(
+                    Modifier
                         .clickable(onClickLabel = stringResource(R.string.playback_time_switch)) {
                             onSettings { it.copy(timeFromStart = !it.timeFromStart) }
                         }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                )
+                        .padding(horizontal = 8.dp),
+                ) {
+                    Text(time, color = MonitorColors.Secondary, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        elapsedText(sessionSeconds ?: 0),
+                        color = MonitorColors.Secondary.copy(alpha = 0.6f),
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
                 LiveButton(live, onLive)
                 Spacer(Modifier.weight(1f))
                 BeepVolume(settings, onSettings)

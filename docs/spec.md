@@ -56,7 +56,8 @@ on battery with the screen off (item 4), which is in `docs/backlog.md`. The owne
    status-bar icon is a heart with the heart rate in it. It asks to be shown as a Live Update,
    with the heart rate as the status-bar chip where the phone draws one.
 5. **The layout adapts to orientation.** Landscape is the monitor layout, with waveforms on the
-   left and numerics on the right; portrait stacks the numerics above the waveforms.
+   left and numerics on the right; portrait stacks the numerics above the waveforms. 0.3 replaces
+   this layout (0.3, item 8).
 
 ## 0.2: rewinding the running capture
 
@@ -106,7 +107,13 @@ cannot end itself properly; it is noted and resumed afterwards instead.
    from the capture's start, and a tap switches between the two. A speaker mutes or unmutes the
    beat beep, and a slider beside it sets the beep's own volume, under the media volume, which it
    still follows; dragging it to nothing mutes. A cog opens the display settings. The choices are
-   kept between runs.
+. **The monitor fills the screen** (also in 0.3). The system status bar is hidden while it is
+   shown, and the waveforms take the full width under one bar that holds, from the left: the strap
+   and its connection; the phone's time and battery; an amber icon, only while battery
+   optimisation is on, that explains itself when tapped; skin contact as an icon, lit or dark, and
+   the strap's battery, the gap count and the last RR interval as icons with values; heart rate
+   and the beat heart; and Stop, which asks before stopping. On a narrow screen the bar takes two
+   rows. How long the capture has run is shown under the timeline's time.
 
 ## Later
 
