@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  * `docs/raw-format.md`. The minor number grows for additive changes, the major number for any
  * change a reader of the previous version would misread.
  */
-const val RAW_SCHEMA: String = "1.0"
+const val RAW_SCHEMA: String = "1.1"
 
 /**
  * One line of a raw file. The serialised form of each subtype is the file format, so within one
@@ -38,6 +38,8 @@ data class Phone(
 data class Sensor(
     val id: String,
     val name: String,
+    /** The Bluetooth address the capture connected to. Added in schema 1.1; absent in 1.0 files. */
+    val address: String? = null,
 )
 
 /** The first line of every raw file. */
@@ -73,8 +75,9 @@ data class EventRecord(
     val recovery: String? = null,
     @SerialName("gatt_status") val gattStatus: Int? = null,
     @SerialName("device_command") val deviceCommand: String? = null,
-    /** Device information name and value, for [RawEvents.DEVICE_INFO]. */
+    /** Device information name, for [RawEvents.DEVICE_INFO]. */
     val key: String? = null,
+    /** Device information value, for [RawEvents.DEVICE_INFO]; `on` or `off`, for [RawEvents.BLE_POWER]. */
     val value: String? = null,
     @SerialName("level_pct") val levelPct: Int? = null,
     /** Every value the sensor offers per setting, for [RawEvents.SETTINGS]. */
@@ -95,6 +98,9 @@ object RawEvents {
     const val SETTINGS = "settings"
     const val STREAM_STARTED = "stream_started"
     const val STREAM_ERROR = "stream_error"
+
+    /** The phone's Bluetooth was switched on or off. */
+    const val BLE_POWER = "ble_power"
 }
 
 /** The values of [EventRecord.stream] and [GapRecord.stream]. */

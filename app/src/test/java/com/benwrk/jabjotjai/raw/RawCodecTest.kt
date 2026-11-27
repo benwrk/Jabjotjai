@@ -12,13 +12,25 @@ class RawCodecTest {
 
     @Test
     fun headerIsWrittenWithTypeFirstAndTheDocumentedFieldNames() {
+        // Schema 1.1: the sensor object gained `address` (docs/raw-format.md, "Schema 1.1").
         assertEquals(
-            """{"type":"header","schema":"1.0","session":"20261127T091530Z-3f9a","app":"0.1.0 (1000)",""" +
+            """{"type":"header","schema":"1.1","session":"20261127T091530Z-3f9a","app":"0.1.0 (1000)",""" +
                 """"sdk":"9.0.0","phone":{"make":"samsung","model":"SM-S931B","android":"16","api":36},""" +
                 """"start":{"wall_ms":1795766523219,"mono_ns":81234567890123},""" +
-                """"sensor":{"id":"A1B2C3D4","name":"Polar H10 A1B2C3D4"},"sensor_epoch":"2000-01-01"}""",
+                """"sensor":{"id":"A1B2C3D4","name":"Polar H10 A1B2C3D4","address":"00:11:22:33:44:55"},""" +
+                """"sensor_epoch":"2000-01-01"}""",
             RawCodec.encode(Samples.header),
         )
+    }
+
+    @Test
+    fun aSchema10HeaderWithoutAnAddressStillReads() {
+        val schema10 = """{"type":"header","schema":"1.0","session":"s","app":"0.1.0 (1000)","sdk":"9.0.0",""" +
+            """"phone":{"make":"samsung","model":"SM-S931B","android":"17","api":37},"start":{"wall_ms":1,"mono_ns":2},""" +
+            """"sensor":{"id":"600D732D","name":"Polar H10 600D732D"},"sensor_epoch":"2000-01-01"}"""
+        val header = (RawCodec.decode(schema10) as RawLine.Record).record as HeaderRecord
+        assertEquals(Sensor(id = "600D732D", name = "Polar H10 600D732D", address = null), header.sensor)
+        assertEquals("1.0", header.schema)
     }
 
     @Test
@@ -146,7 +158,7 @@ internal object Samples {
         sdk = "9.0.0",
         phone = Phone(make = "samsung", model = "SM-S931B", android = "16", api = 36),
         start = Stamp(wallMs = 1795766523219, monoNs = 81234567890123),
-        sensor = Sensor(id = "A1B2C3D4", name = "Polar H10 A1B2C3D4"),
+        sensor = Sensor(id = "A1B2C3D4", name = "Polar H10 A1B2C3D4", address = "00:11:22:33:44:55"),
         sensorEpoch = "2000-01-01",
     )
     val ecg = EcgRecord(

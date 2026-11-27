@@ -90,8 +90,11 @@ Something that happened to the connection or a stream. Every event has `wall_ms`
 | `settings`       | `stream`; `available`, every value offered per setting; `selected`, the value requested per setting         |
 | `stream_started` | `stream`                                                                                                   |
 | `stream_error`   | `stream`, `message`                                                                                        |
+| `ble_power`      | `value`: `on` or `off`, when the phone's Bluetooth is switched                                             |
 
-Setting names in `available` and `selected`: `rate_hz`, `range_g`, `bits`, `channels`.
+Setting names in `available` and `selected`: `rate_hz`, `bits`, `channels`, and `range_g` for the
+accelerometer's range in g. A range on any other stream is written as `range`, because the SDK
+does not document its unit.
 
 ### `ecg`
 
@@ -148,3 +151,11 @@ those is analysis of the raw file, not something the writer decides.
 
 The last line of a file that was closed deliberately: `wall_ms`, `mono_ns`, `reason`, and
 `open_gaps`, a list of `gap` objects for streams that had not resumed, without their `to_` fields.
+
+## Schema 1.1
+
+First written by app 0.1.0. Everything in 1.0, plus:
+
+- **`header.sensor.address`** (string): the Bluetooth address the capture connected to, as the scan
+  saw the strap advertising. A phone can hold more than one bond for the same strap, at different
+  addresses; this says which one the data came through. Absent in 1.0 files.
