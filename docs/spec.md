@@ -147,7 +147,7 @@ across rows with one cursor, and up to five ECG rows cascaded.
 
 ## 0.5: rows with their own speeds, and heart-rate and RR rows
 
-The current scope.
+Built and seen working on the test phone.
 
 1. **Each row is separate, cascaded or joined** with the row above. A separate row is a graph of
    its own, which may show the same signal as the row above at another speed; cascaded and joined
@@ -163,6 +163,19 @@ The current scope.
    of the file read again.
 4. **Gain stays one per signal**, so every ECG row is drawn at the same millivolts per millimetre
    and rows can be compared directly.
+
+## 0.6: trends across a resumed capture
+
+The current scope.
+
+1. **Heart-rate and RR rows reach back through a resumed capture.** A capture resumed after Android
+   stopped the app, an update or the offer to resume is a new file whose header names the one it
+   continues (0.3); its heart-rate and RR rows show those earlier files' values too, oldest first,
+   following each header back, with the time between files left as a break and never joined.
+2. **Earlier files are placed on the current file's clock.** If the phone restarted between two
+   files, its monotonic clock started again, so an earlier file's times are moved by the difference
+   between the wall-clock and monotonic times both headers record; otherwise they are used as they
+   are.
 
 ## Later
 
