@@ -180,6 +180,10 @@ The current scope.
    and the notification carry on. Each heart-rate and RR row shows how far that reading has got, as
    a bar and a percentage, and afterwards how many earlier recordings could not be read, if any; one
    that cannot be read is skipped and the rest still read, and a line that cannot be is passed over.
+4. **The timeline spans the whole resumed capture**, from the start of its first file to now, and
+   the time under it counts from there. Seeking, jumping or playing into an earlier file reads that
+   file, and playing on carries across into the next; the time between files shows as a gap, never
+   joined. Until the earlier files have been read, the timeline starts at the current file.
 
 ## Later
 
