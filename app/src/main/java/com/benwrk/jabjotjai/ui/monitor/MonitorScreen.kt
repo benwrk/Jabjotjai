@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,6 +62,8 @@ import com.benwrk.jabjotjai.monitor.DisplaySettings
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
 import com.benwrk.jabjotjai.monitor.Playback
+import com.benwrk.jabjotjai.monitor.RowSignal
+import com.benwrk.jabjotjai.monitor.chartGraphs
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.TraceSnapshot
 import com.benwrk.jabjotjai.monitor.elapsedSeconds
@@ -108,18 +111,25 @@ fun MonitorScreen(
     val waves = remember { derivedStateOf { if (playback.value is Playback.Live) liveWaves.value else replay.value } }
     val vitals = remember { derivedStateOf { if (playback.value is Playback.Live) live.value.snapshot else replay.value } }
 
-    val ecgBandMm = remember { mutableFloatStateOf(0f) }
-    val accBandMm = remember { mutableFloatStateOf(0f) }
-    val ecgScale = rememberBandScale(waves, ScaleLadder.ECG, settings.value.ecgAuto, settings.value.ecgGainIndex, ecgBandMm) {
+    // The height of each signal's shortest graph, which its automatic scale fits the trace to.
+    val bandMm = remember { RowSignal.entries.associateWith { mutableFloatStateOf(0f) } }
+    val ecgScale = rememberBandScale(waves, ScaleLadder.ECG, settings.value.ecgAuto, settings.value.ecgGainIndex, bandMm.getValue(RowSignal.ECG)) {
         listOf(it.ecg)
     }
-    val accScale = rememberBandScale(waves, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, accBandMm) {
+    val accScale = rememberBandScale(waves, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, bandMm.getValue(RowSignal.ACC)) {
         listOf(it.accX, it.accY, it.accZ)
+    }
+    // A single axis has a scale of its own, so it is centred on its own level rather than all three's.
+    val axisScales = ACC_AXES.associate { axis ->
+        axis.signal to rememberBandScale(waves, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, bandMm.getValue(axis.signal)) {
+            listOf(axis.trace(it))
+        }
     }
     var showDisplaySheet by rememberSaveable { mutableStateOf(false) }
 
     // Every argument is a remembered state object, so one holder serves for as long as the scale holds.
-    val bands = remember(pxPerMm) { Bands(waves, displayClock, pxPerMm, settings, ecgScale, accScale, ecgBandMm, accBandMm) }
+    val scales = mapOf(RowSignal.ECG to ecgScale, RowSignal.ACC to accScale) + axisScales
+    val bands = remember(pxPerMm) { Bands(waves, displayClock, pxPerMm, settings, scales, bandMm) }
     val playheadAtSecond = playback.value.positionNs(secondsClock.value)
     BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background)) {
         val wide = maxWidth >= WIDE_TOP_BAR
@@ -179,25 +189,43 @@ private class Bands(
     val frameClock: State<Long>,
     val pxPerMm: Float,
     val settings: State<DisplaySettings>,
-    val ecgScale: State<BandScale>,
-    val accScale: State<BandScale>,
-    val ecgBandMm: MutableFloatState,
-    val accBandMm: MutableFloatState,
+    val scales: Map<RowSignal, State<BandScale>>,
+    val bandMm: Map<RowSignal, MutableFloatState>,
 ) {
+    val ecgScale: State<BandScale> get() = scales.getValue(RowSignal.ECG)
+
     val mmPerSecond: () -> Float = { settings.value.sweep.mmPerSecond }
 }
 
-/** The ECG band above one accelerometer band holding all three axes, each half the height. */
+/**
+ * The chart: its graphs top to bottom (see [chartGraphs]), each as tall as its rows. Each signal's
+ * automatic scale fits its shortest graph, so the trace fits in every graph of it.
+ */
 @Composable
 private fun Waveforms(bands: Bands, modifier: Modifier) {
+    val graphs = chartGraphs(bands.settings.value.rows)
+    val heightsMm = remember(graphs) { mutableStateMapOf<Int, Float>() }
     Column(modifier) {
-        EcgBand(bands, Modifier.weight(1f).onSizeChanged { bands.ecgBandMm.floatValue = it.height / bands.pxPerMm })
-        AccBand(bands, Modifier.weight(1f).onSizeChanged { bands.accBandMm.floatValue = it.height / bands.pxPerMm })
+        graphs.forEachIndexed { index, graph ->
+            val graphModifier = Modifier.weight(graph.rows.toFloat()).onSizeChanged { size ->
+                heightsMm[index] = size.height / bands.pxPerMm
+                bands.bandMm.getValue(graph.signal).floatValue =
+                    graphs.indices.filter { graphs[it].signal == graph.signal }.minOf { heightsMm[it] ?: Float.MAX_VALUE }
+            }
+            when (graph.signal) {
+                RowSignal.ECG -> EcgBand(bands, graph.sweepsBack, graphModifier)
+                RowSignal.ACC -> AccBand(bands, ACC_AXES, bands.scales.getValue(RowSignal.ACC), graph.sweepsBack, graphModifier)
+                else -> {
+                    val axis = ACC_AXES.first { it.signal == graph.signal }
+                    AccBand(bands, listOf(axis), bands.scales.getValue(axis.signal), graph.sweepsBack, graphModifier)
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun EcgBand(bands: Bands, modifier: Modifier) {
+private fun EcgBand(bands: Bands, sweepsBack: Int, modifier: Modifier) {
     val scale = bands.ecgScale.value
     val gain = ScaleLadder.ECG.mmPerUnit(scale.index)
     val label = stringResource(
@@ -216,6 +244,7 @@ private fun EcgBand(bands: Bands, modifier: Modifier) {
             pxPerMm = bands.pxPerMm,
             mmPerSecond = bands.mmPerSecond,
             offsetPx = bandOffset(ScaleLadder.ECG, bands.ecgScale, bands.pxPerMm),
+            sweepsBack = sweepsBack,
             modifier = Modifier.fillMaxSize(),
         )
         if (bands.settings.value.calibrationPulse) CalibrationPulse(bands, Modifier.fillMaxSize())
@@ -223,26 +252,26 @@ private fun EcgBand(bands: Bands, modifier: Modifier) {
 }
 
 /**
- * X, Y and Z on one scale and around one centre, so each axis keeps its true level (gravity
- * included) relative to the others.
+ * The accelerometer: [axes] on one scale and around one centre, so with all three each axis keeps
+ * its true level (gravity included) relative to the others, and one axis alone is centred on its own.
  */
 @Composable
-private fun AccBand(bands: Bands, modifier: Modifier) {
-    val scale = bands.accScale.value
+private fun AccBand(bands: Bands, axes: List<AccAxis>, bandScale: State<BandScale>, sweepsBack: Int, modifier: Modifier) {
+    val scale = bandScale.value
     val title = stringResource(R.string.monitor_acc_label)
     val scaleText = stringResource(R.string.monitor_acc_scale, plainNumber(ScaleLadder.ACC.mmPerUnit(scale.index))) +
         if (bands.settings.value.accAuto) " " + stringResource(R.string.monitor_auto) else ""
     val label = buildAnnotatedString {
         withStyle(SpanStyle(color = MonitorColors.Text)) { append(title) }
-        for (axis in ACC_AXES) {
+        for (axis in axes) {
             append(" ")
             withStyle(SpanStyle(color = axis.color)) { append(axis.name) }
         }
         withStyle(SpanStyle(color = MonitorColors.Text)) { append(" $scaleText") }
     }
     Band(label = { Text(label, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
-        val offset = bandOffset(ScaleLadder.ACC, bands.accScale, bands.pxPerMm)
-        for (axis in ACC_AXES) {
+        val offset = bandOffset(ScaleLadder.ACC, bandScale, bands.pxPerMm)
+        for (axis in axes) {
             SweepTrace(
                 snapshot = bands.snapshot,
                 nowMonoNs = bands.frameClock,
@@ -252,18 +281,19 @@ private fun AccBand(bands: Bands, modifier: Modifier) {
                 pxPerMm = bands.pxPerMm,
                 mmPerSecond = bands.mmPerSecond,
                 offsetPx = offset,
+                sweepsBack = sweepsBack,
                 modifier = Modifier.fillMaxSize(),
             )
         }
     }
 }
 
-private class AccAxis(val name: String, val color: Color, val trace: (MonitorSnapshot) -> TraceSnapshot)
+private class AccAxis(val signal: RowSignal, val name: String, val color: Color, val trace: (MonitorSnapshot) -> TraceSnapshot)
 
 private val ACC_AXES = listOf(
-    AccAxis("X", MonitorColors.AccX) { it.accX },
-    AccAxis("Y", MonitorColors.AccY) { it.accY },
-    AccAxis("Z", MonitorColors.AccZ) { it.accZ },
+    AccAxis(RowSignal.ACC_X, "X", MonitorColors.AccX) { it.accX },
+    AccAxis(RowSignal.ACC_Y, "Y", MonitorColors.AccY) { it.accY },
+    AccAxis(RowSignal.ACC_Z, "Z", MonitorColors.AccZ) { it.accZ },
 )
 
 /** How far above a band's middle line a sample is drawn, at the band's current scale. */

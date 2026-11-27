@@ -54,6 +54,8 @@ fun DisplaySheet(
         ) {
             Text(stringResource(R.string.display_title), style = MaterialTheme.typography.titleMedium)
 
+            RowsEditor(settings.rows) { rows -> onChange { it.copy(rows = rows) } }
+
             Choices(stringResource(R.string.display_sweep)) {
                 for (speed in SweepSpeed.entries) {
                     FilterChip(

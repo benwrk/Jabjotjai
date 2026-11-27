@@ -86,6 +86,18 @@
     <string name="display_gain_step">×%1$s</string>
     <string name="display_pulse">Calibration pulse</string>
     <string name="display_pulse_hint">A 1 mV pulse at the left of the ECG, rising from the line where the trace draws 0 mV.</string>
+    <string name="display_rows">Rows</string>
+    <string name="display_rows_hint">Rows of the same signal next to each other are one taller graph when joined; otherwise each row carries the trace on from the row above.</string>
+    <string name="display_row">Row %1$d</string>
+    <string name="display_row_joined">Joined with the row above</string>
+    <string name="display_row_cascaded">Carries on from the row above</string>
+    <string name="display_row_add">Add a row</string>
+    <string name="display_row_remove">Remove the last row</string>
+    <string name="signal_ecg">ECG</string>
+    <string name="signal_acc">ACC XYZ</string>
+    <string name="signal_acc_x">ACC X</string>
+    <string name="signal_acc_y">ACC Y</string>
+    <string name="signal_acc_z">ACC Z</string>
     <string name="display_beep_background">Keep beeping in the background</string>
     <string name="display_beep_background_hint">Go on beeping when the app is not on screen, with the screen off too, until the capture stops. Uses more battery.</string>
 

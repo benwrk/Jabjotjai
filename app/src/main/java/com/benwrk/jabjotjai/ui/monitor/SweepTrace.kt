@@ -26,6 +26,7 @@ import com.benwrk.jabjotjai.ui.theme.MonitorColors
  *
  * @param mmPerSecond the sweep speed, read while drawing
  * @param offsetPx how far above the band's centre a sample value is drawn
+ * @param sweepsBack how many whole sweeps before now to show, for a cascaded graph
  */
 @Composable
 fun SweepTrace(
@@ -37,6 +38,7 @@ fun SweepTrace(
     pxPerMm: Float,
     mmPerSecond: () -> Float,
     offsetPx: (value: Int) -> Float,
+    sweepsBack: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier) {
@@ -46,7 +48,8 @@ fun SweepTrace(
         if (samples.size == 0 || size.width <= 0f) return@Canvas
 
         val windowNs = Sweep.windowNs(size.width / pxPerMm, mmPerSecond())
-        val cursorNs = Sweep.cursorNs(frameTiming, nowMonoNs.value)
+        // A cascaded graph shows whole sweeps back, so its samples fall where they did a sweep ago.
+        val cursorNs = Sweep.cursorNs(frameTiming, nowMonoNs.value) - sweepsBack * windowNs
         val half = size.height / 2f
         val path = Path()
         val clipped = Path()

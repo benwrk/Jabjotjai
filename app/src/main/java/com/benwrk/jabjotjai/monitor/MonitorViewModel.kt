@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
@@ -67,17 +68,29 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
     val displaySettings: StateFlow<DisplaySettings> = DisplaySettingsStore.settings
 
+    /**
+     * How many sweeps of history the chart needs: one, and one more for each sweep the deepest
+     * cascade looks back. The model keeps, and the readers read, [MonitorModel.DEFAULT_KEEP_NS] for
+     * each, which holds a whole sweep even at the slowest speed.
+     */
+    private val sweepsKept = DisplaySettingsStore.settings.map { deepestCascade(chartGraphs(it.rows)) + 1 }.distinctUntilChanged()
+
     fun updateDisplaySettings(change: (DisplaySettings) -> DisplaySettings) = DisplaySettingsStore.update(change)
 
     init {
         DisplaySettingsStore.init(application)
         val runningFile = Capture.state.map { (it as? CaptureState.Running)?.file }.distinctUntilChanged()
         viewModelScope.launch {
-            runningFile.collectLatest { file ->
+            runningFile.collectLatest {
                 mutableSnapshot.value = MonitorSnapshot.EMPTY
                 mutableReadError.value = null
                 mutablePlayback.value = Playback.Live
-                if (file != null) follow(file)
+            }
+        }
+        viewModelScope.launch {
+            // Read again from further back when a cascade needs more sweeps kept.
+            combine(runningFile, sweepsKept, ::Pair).collectLatest { (file, sweeps) ->
+                if (file != null) follow(file, sweeps)
             }
         }
         viewModelScope.launch {
@@ -171,11 +184,11 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         replayStart.value++
     }
 
-    private suspend fun follow(file: File) {
-        val model = MonitorModel()
+    private suspend fun follow(file: File, sweeps: Int) {
+        val model = MonitorModel(MonitorModel.DEFAULT_KEEP_NS * sweeps)
         try {
             model.setHeader(awaitHeader(file))
-            RawTail(file).lines(RawTail.Start.NearEnd(TAIL_START_BYTES)).collect { line ->
+            RawTail(file).lines(RawTail.Start.NearEnd(TAIL_START_BYTES * sweeps)).collect { line ->
                 model.accept(line)
                 mutableSnapshot.value = model.snapshot()
             }
@@ -192,7 +205,8 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
      * had arrived by then. Lines up to the playhead are taken at once, and published together.
      */
     private suspend fun replay(file: File) {
-        val (model, start) = modelFrom(mutablePlayback.value.positionNs(nowNs()) - REPLAY_LEAD_NS) ?: return
+        val sweeps = sweepsKept.first()
+        val (model, start) = modelFrom(mutablePlayback.value.positionNs(nowNs()) - REPLAY_LEAD_NS * sweeps, sweeps) ?: return
         mutableReplay.value = model.snapshot()
         reportingReadErrors {
             RawTail(file).linesWithOffsets(start).collect { (_, line) ->
@@ -212,7 +226,8 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
      * playhead move there together, so what is drawn always matches the moment it is drawn at.
      */
     private suspend fun readMoment(file: File, targetNs: Long) {
-        val (model, start) = modelFrom(targetNs - SCRUB_LEAD_NS) ?: return
+        val sweeps = sweepsKept.first()
+        val (model, start) = modelFrom(targetNs - SCRUB_LEAD_NS * sweeps, sweeps) ?: return
         reportingReadErrors {
             RawTail(file).linesWithOffsets(start)
                 .takeWhile { (_, line) -> ((line as? RawLine.Record)?.record?.timeMonoNs() ?: Long.MIN_VALUE) <= targetNs }
@@ -229,12 +244,12 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
      * A model for reading from [fromNs]: it starts at the last mark the capture's reader noted at
      * or before then, with the state as it stood there, and the place in the file to read from.
      */
-    private fun modelFrom(fromNs: Long): Pair<MonitorModel, RawTail.Start>? {
+    private fun modelFrom(fromNs: Long, sweeps: Int): Pair<MonitorModel, RawTail.Start>? {
         val live = Capture.live.value
         val timeline = live.timeline ?: return null
         val header = live.snapshot.header ?: return null
         val mark = timeline.markAtOrBefore(fromNs)
-        val model = MonitorModel()
+        val model = MonitorModel(MonitorModel.DEFAULT_KEEP_NS * sweeps)
         model.setHeader(header)
         model.startFrom(if (mark == null) CaptureStateAt.INITIAL else timeline.stateAt(mark.monoNs - 1))
         return model to (if (mark == null) RawTail.Start.Beginning else RawTail.Start.At(mark.offset))

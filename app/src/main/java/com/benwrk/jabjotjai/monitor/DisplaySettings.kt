@@ -60,6 +60,7 @@ class ScaleLadder(
  * @param beepVolume the beep's own level, from 0 to 1, under the media volume; see [beepGain]
  * @param beepInBackground with [beep], keep beeping while the monitor is not on screen as well
  * @param timeFromStart the timeline's time counts from the capture's start rather than back from live
+ * @param rows the chart's rows, top to bottom; see [chartGraphs]
  */
 data class DisplaySettings(
     val sweep: SweepSpeed = SweepSpeed.MM_25,
@@ -72,6 +73,7 @@ data class DisplaySettings(
     val beepInBackground: Boolean = false,
     val beepVolume: Float = 1f,
     val timeFromStart: Boolean = false,
+    val rows: List<ChartRow> = DEFAULT_CHART_ROWS,
 )
 
 /** Where a band's middle line sits, in sample units, and which step of its ladder it draws at. */

@@ -25,6 +25,7 @@ object DisplaySettingsStore {
     private const val BEEP_IN_BACKGROUND = "beep_in_background"
     private const val BEEP_VOLUME = "beep_volume"
     private const val TIME_FROM_START = "time_from_start"
+    private const val CHART_ROWS = "chart_rows"
 
     private val mutableSettings = MutableStateFlow(DisplaySettings())
     val settings: StateFlow<DisplaySettings> = mutableSettings.asStateFlow()
@@ -61,6 +62,7 @@ object DisplaySettingsStore {
             beepInBackground = prefs.getBoolean(BEEP_IN_BACKGROUND, defaults.beepInBackground),
             beepVolume = prefs.getFloat(BEEP_VOLUME, defaults.beepVolume).coerceIn(0f, 1f),
             timeFromStart = prefs.getBoolean(TIME_FROM_START, defaults.timeFromStart),
+            rows = prefs.getString(CHART_ROWS, null)?.let(::decodeChartRows) ?: defaults.rows,
         )
     }
 
@@ -76,6 +78,7 @@ object DisplaySettingsStore {
             .putBoolean(BEEP_IN_BACKGROUND, settings.beepInBackground)
             .putFloat(BEEP_VOLUME, settings.beepVolume)
             .putBoolean(TIME_FROM_START, settings.timeFromStart)
+            .putString(CHART_ROWS, encodeChartRows(settings.rows))
             .apply()
     }
 }
