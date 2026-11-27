@@ -3,6 +3,7 @@ package com.benwrk.jabjotjai.capture
 import com.benwrk.jabjotjai.monitor.HR_STALE_NS
 import com.benwrk.jabjotjai.monitor.MonitorModel
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
+import com.benwrk.jabjotjai.monitor.elapsedText
 import com.benwrk.jabjotjai.raw.EventRecord
 import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.HrRecord
@@ -44,15 +45,21 @@ class NotificationContentTest {
     }
 
     @Test
-    fun withTheScreenOnItShowsTheHeartRate() {
-        val content = NotificationContent.of(snapshot(), nowMonoNs = startMonoNs + 2 * second, readFailed = false, screenOn = true)
-        assertEquals(NotificationContent(bpm = 72, connection = RawEvents.CONNECTED, gaps = 0, batteryPct = 90, readFailed = false), content)
+    fun withTheScreenOnItShowsTheHeartRateAndTheTimeSinceTheStart() {
+        val content = NotificationContent.of(snapshot(), nowMonoNs = startMonoNs + 3_725 * second, readFailed = false, screenOn = true)
+        // 3725 s after the start; the heart rate arrived long before, so it is stale by then.
+        assertEquals(NotificationContent(bpm = null, elapsedSeconds = 3_725, connection = RawEvents.CONNECTED, gaps = 0, batteryPct = 90, readFailed = false), content)
+        assertEquals("1:02:05", elapsedText(content.elapsedSeconds!!))
+
+        val fresh = NotificationContent.of(snapshot(), nowMonoNs = startMonoNs + 2 * second, readFailed = false, screenOn = true)
+        assertEquals(72, fresh.bpm)
+        assertEquals(2L, fresh.elapsedSeconds)
     }
 
     @Test
-    fun withTheScreenOffItLeavesOutTheHeartRateAndKeepsTheRest() {
+    fun withTheScreenOffItLeavesOutWhatChangesEverySecondAndKeepsTheRest() {
         val content = NotificationContent.of(snapshot(), nowMonoNs = startMonoNs + 2 * second, readFailed = false, screenOn = false)
-        assertEquals(NotificationContent(bpm = null, connection = RawEvents.CONNECTED, gaps = 0, batteryPct = 90, readFailed = false), content)
+        assertEquals(NotificationContent(bpm = null, elapsedSeconds = null, connection = RawEvents.CONNECTED, gaps = 0, batteryPct = 90, readFailed = false), content)
     }
 
     @Test
@@ -63,8 +70,8 @@ class NotificationContentTest {
     }
 
     @Test
-    fun aReadFailureIsCarriedThrough() {
+    fun beforeTheHeaderIsReadThereIsNoElapsedTime() {
         val content = NotificationContent.of(MonitorSnapshot.EMPTY, nowMonoNs = 5 * second, readFailed = true, screenOn = true)
-        assertEquals(NotificationContent(bpm = null, connection = null, gaps = 0, batteryPct = null, readFailed = true), content)
+        assertEquals(NotificationContent(bpm = null, elapsedSeconds = null, connection = null, gaps = 0, batteryPct = null, readFailed = true), content)
     }
 }
