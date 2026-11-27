@@ -93,19 +93,39 @@ yet as specified:
   killer, is why no restart was scheduled, or One UI's battery management.
 - **The dead capture's notification stayed up**: the lock screen showed its heart icon with a
   heart rate three and a half minutes after the kill, while nothing was capturing.
-- **An update does not always resume by itself.** Seen twice on 2026-11-27 with the app on
-  screen: Android restarted the app for its on-screen activity before sending the update
-  broadcast, and `adb shell dumpsys activity broadcasts history` lists `MY_PACKAGE_REPLACED` to
-  `UpdateReceiver` as SKIPPED, reason `mBroadcastConsumerSkip`; the picker then wrote the ending
-  note and offered to resume. Seen again on 2026-11-28 with the app off screen: two installs
-  from the home screen four minutes apart, the first at 00:50 resumed the capture, the second at
-  00:54 was SKIPPED the same way, nothing restarted the service, and the capture stayed stopped
-  until the app was opened 90 s later and Resume tapped. The phone showed its lock screen at
-  00:55; whether it was locked at 00:54 is not known. Mechanism unconfirmed. Until it is, an
-  update can end a capture silently until the app is next opened.
+- **An update does not always resume by itself**: see "Find why an update sometimes does not
+  resume the capture" below.
 
 Done when each has been seen on the test phone, with the date, and the raw files checked, or the
 spec changed to say what happens instead.
+
+## Find why an update sometimes does not resume the capture
+
+An update during a capture is meant to resume it by itself: Android sends the updated app
+`ACTION_MY_PACKAGE_REPLACED`, and `UpdateReceiver` resumes the capture (decision `0013`). Three
+times it did not. Each time `adb shell dumpsys activity broadcasts history` listed
+`MY_PACKAGE_REPLACED` to `UpdateReceiver` as SKIPPED, reason `mBroadcastConsumerSkip`, nothing
+else restarted the service, and the capture stayed stopped until the app was opened and Resume
+tapped:
+
+- 2026-11-27, twice, with the app on screen; Android restarted the app for its activity before
+  sending the broadcast.
+- 2026-11-28 at 00:54, with the app off screen after pressing Home. The phone showed its lock
+  screen at 00:55; whether it was locked at 00:54 is not known. The capture was stopped for 90 s.
+
+The other installs that night, ten between 00:09 and 02:12, all from the home screen with the
+phone unlocked, resumed by themselves. Mechanism unconfirmed: what makes Android skip the
+broadcast is decided in its broadcast queue, whose source is not among the SDK sources. Until it is
+understood, an update can leave a capture stopped until the app is next opened, so the safe way to
+update during a recording is from the home screen with the phone unlocked, then checking that it
+resumed.
+
+To tell the next occurrence apart, record for each install during a capture: the time; whether
+the phone was locked and its screen on (`dumpsys window`, `isKeyguardShowing`; `dumpsys power`,
+`mWakefulness`); whether the app was on screen; `dumpsys activity broadcasts history` around
+`MY_PACKAGE_REPLACED`; and the event log (`logcat -b events`) for the package's `am_proc_died`,
+`am_kill` and force-stop entries. Done when the cause is known, and either every update resumes the
+capture, by the broadcast or another way, or the app and README say when it does not.
 
 ## Prove on the phone that 0.6 places an earlier file correctly after a restart
 
