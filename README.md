@@ -1,7 +1,7 @@
 # Jabjotjai
 
 <p align="center">
-  <img src="docs/screenshots/monitor-landscape.gif" alt="The live monitor in landscape while the wearer moves: ECG, the accelerometer's X, Y and Z, and 15-minute heart-rate and RR trends, with the strap's status in the bar above" width="900">
+  <img src="docs/screenshots/monitor-landscape.gif" alt="The live monitor in landscape, reaching the screen's edges under the camera: two cascaded ECG rows, 5-minute heart-rate and RR trends broken where the recording resumed, and the accelerometer's Z axis, with the strap's status in the bar above" width="900">
 </p>
 
 **A Holter-style recorder for a chest-strap ECG sensor.**
@@ -28,7 +28,7 @@ because uninstalling deletes them.
     <td rowspan="3"><img src="docs/screenshots/monitor-portrait.png" alt="The monitor in portrait: fast and slow ECG above heart-rate and RR trends" width="170"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/monitor-trends.png" alt="ECG above 15-minute heart-rate and RR trends, broken where the recording resumed" width="400"></td>
+    <td><img src="docs/screenshots/trend-readout.png" alt="A finger held on the heart-rate row reads the value and the time under it, 73 bpm at 03:45:18" width="400"></td>
     <td><img src="docs/screenshots/chart-rows.png" alt="The display settings: heart-rate and RR rows, each with its time span and whether it sweeps or scrolls" width="400"></td>
   </tr>
   <tr>
