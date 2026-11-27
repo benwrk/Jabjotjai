@@ -162,53 +162,57 @@ fun MonitorScreen(
     val bands = remember(pxPerMm, session) { Bands(waves, trends, earlier, displayClock, pxPerMm, settings, scales, bandMm) }
     val playheadAtSecond = playback.value.positionNs(secondsClock.value)
     // The system bars and the camera cut-out, which every other screen keeps clear of whole. Here the
-    // bars above and below the chart keep clear of both, and the chart, if set to, reaches under the
-    // cut-out with its labels moved clear of it (see Band).
+    // monitor, if set to, reaches under the cut-out from edge to edge, the bars above and below the
+    // chart kept in from a side the camera overlaps (see ClearOfCutout) and the chart's labels moved
+    // clear of it (see Band).
     val safe = ScaffoldDefaults.contentWindowInsets
     val underCutout = settings.value.chartUnderCutout
-    val chartSides = if (underCutout) WindowInsets.systemBars else safe
+    val sides = (if (underCutout) WindowInsets.systemBars else safe).only(WindowInsetsSides.Horizontal)
     val cutout = if (underCutout) rememberCutoutInWindow() else emptyList()
     BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background).windowInsetsPadding(safe.only(WindowInsetsSides.Vertical))) {
         val wide = maxWidth >= WIDE_TOP_BAR
-        Column(Modifier.fillMaxSize()) {
-            MonitorTopBar(
-                modifier = Modifier.windowInsetsPadding(safe.only(WindowInsetsSides.Horizontal)),
-                sensorId = running.sensorId,
-                sensorName = running.sensorName,
-                live = live.value.snapshot,
-                vitals = vitals,
-                frameClock = displayClock,
-                playheadNs = playheadAtSecond,
-                beepError = beepError,
-                wide = wide,
-                onStop = onStop,
-            )
-            (readError ?: live.value.readError)?.let {
-                Text(
-                    stringResource(R.string.monitor_read_error, it),
-                    color = MonitorColors.Alarm,
-                    modifier = Modifier.windowInsetsPadding(safe.only(WindowInsetsSides.Horizontal)).padding(horizontal = 12.dp),
-                )
+        CompositionLocalProvider(LocalCutout provides cutout) {
+            Column(Modifier.fillMaxSize()) {
+                ClearOfCutout(Modifier.fillMaxWidth().windowInsetsPadding(sides)) {
+                    MonitorTopBar(
+                        sensorId = running.sensorId,
+                        sensorName = running.sensorName,
+                        live = live.value.snapshot,
+                        vitals = vitals,
+                        frameClock = displayClock,
+                        playheadNs = playheadAtSecond,
+                        beepError = beepError,
+                        wide = wide,
+                        onStop = onStop,
+                    )
+                }
+                (readError ?: live.value.readError)?.let {
+                    Text(
+                        stringResource(R.string.monitor_read_error, it),
+                        color = MonitorColors.Alarm,
+                        modifier = Modifier.windowInsetsPadding(sides).padding(horizontal = 12.dp),
+                    )
+                }
+                Waveforms(bands, Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(sides))
+                ClearOfCutout(Modifier.fillMaxWidth().windowInsetsPadding(sides)) {
+                    PlaybackBar(
+                        playback = playback.value,
+                        startNs = captureStartNs,
+                        nowNs = secondsClock.value,
+                        sessionSeconds = captureStartNs?.let { ((secondsClock.value - it) / 1_000_000_000L).coerceAtLeast(0) },
+                        settings = settings.value,
+                        onSettings = viewModel::updateDisplaySettings,
+                        onOpenSettings = { showDisplaySheet = true },
+                        onTogglePause = viewModel::togglePause,
+                        onScrub = viewModel::scrub,
+                        onSeek = viewModel::endScrub,
+                        onSpeed = viewModel::setSpeed,
+                        onLive = viewModel::goLive,
+                        onJump = viewModel::jump,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
-            CompositionLocalProvider(LocalCutout provides cutout) {
-                Waveforms(bands, Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(chartSides.only(WindowInsetsSides.Horizontal)))
-            }
-            PlaybackBar(
-                playback = playback.value,
-                startNs = captureStartNs,
-                nowNs = secondsClock.value,
-                sessionSeconds = captureStartNs?.let { ((secondsClock.value - it) / 1_000_000_000L).coerceAtLeast(0) },
-                settings = settings.value,
-                onSettings = viewModel::updateDisplaySettings,
-                onOpenSettings = { showDisplaySheet = true },
-                onTogglePause = viewModel::togglePause,
-                onScrub = viewModel::scrub,
-                onSeek = viewModel::endScrub,
-                onSpeed = viewModel::setSpeed,
-                onLive = viewModel::goLive,
-                onJump = viewModel::jump,
-                modifier = Modifier.fillMaxWidth().windowInsetsPadding(safe.only(WindowInsetsSides.Horizontal)),
-            )
         }
     }
 
