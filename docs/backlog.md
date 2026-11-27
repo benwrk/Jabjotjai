@@ -123,11 +123,16 @@ yet as specified:
   killer, is why no restart was scheduled, or One UI's battery management.
 - **The dead capture's notification stayed up**: the lock screen showed its heart icon with a
   heart rate three and a half minutes after the kill, while nothing was capturing.
-- **An update while the app is on screen does not resume by itself.** Seen twice on 2026-11-27:
-  Android restarted the app for its on-screen activity before sending the update broadcast, and
-  `adb shell dumpsys activity broadcasts history` lists `MY_PACKAGE_REPLACED` to `UpdateReceiver`
-  as SKIPPED, reason `mBroadcastConsumerSkip`; the picker then wrote the ending note and offered
-  to resume. Mechanism unconfirmed.
+- **An update does not always resume by itself.** Seen twice on 2026-11-27 with the app on
+  screen: Android restarted the app for its on-screen activity before sending the update
+  broadcast, and `adb shell dumpsys activity broadcasts history` lists `MY_PACKAGE_REPLACED` to
+  `UpdateReceiver` as SKIPPED, reason `mBroadcastConsumerSkip`; the picker then wrote the ending
+  note and offered to resume. Seen again on 2026-11-28 with the app off screen: two installs
+  from the home screen four minutes apart, the first at 00:50 resumed the capture, the second at
+  00:54 was SKIPPED the same way, nothing restarted the service, and the capture stayed stopped
+  until the app was opened 90 s later and Resume tapped. The phone showed its lock screen at
+  00:55; whether it was locked at 00:54 is not known. Mechanism unconfirmed. Until it is, an
+  update can end a capture silently until the app is next opened.
 
 Done when each has been seen on the test phone, with the date, and the raw files checked, or the
 spec changed to say what happens instead.
