@@ -21,6 +21,7 @@ import com.benwrk.jabjotjai.monitor.CaptureTimeline
 import com.benwrk.jabjotjai.monitor.DisplaySettingsStore
 import com.benwrk.jabjotjai.monitor.MonitorModel
 import com.benwrk.jabjotjai.monitor.beepAtBeats
+import com.benwrk.jabjotjai.monitor.beepGain
 import com.benwrk.jabjotjai.monitor.elapsedText
 import com.benwrk.jabjotjai.monitor.timeMonoNs
 import com.benwrk.jabjotjai.raw.AccRecord
@@ -319,7 +320,12 @@ class CaptureService : Service() {
             Capture.publishBeepError(null)
             if (!wanted) return@collectLatest
             try {
-                withContext(Dispatchers.IO) { beepAtBeats { Capture.replayBeats.value ?: Capture.live.value.snapshot.beats } }
+                withContext(Dispatchers.IO) {
+                    beepAtBeats(
+                        beats = { Capture.replayBeats.value ?: Capture.live.value.snapshot.beats },
+                        gain = { DisplaySettingsStore.settings.value.beepGain },
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

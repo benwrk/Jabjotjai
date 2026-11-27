@@ -51,15 +51,21 @@ class BeatBeeper : AutoCloseable {
         .also { it.write(TONE, 0, TONE.size) }
 
     private var reportedSlow = false
+    private var currentGain = 1f
 
     /**
-     * Plays the tone from its start, cutting off the previous one if it is still sounding. The first
-     * beep that is slow to start is logged; on the test phone every one took 72 to 86 ms
-     * (2026-11-27), so logging each would fill the log all night.
+     * Plays the tone at [gain] from its start, cutting off the previous one if it is still sounding.
+     * The gain is linear, 1 leaves the tone unchanged and 0 silences it (`AudioTrack.setVolume`, SDK
+     * 37 source, read 2026-11-27). The first beep that is slow to start is logged; on the test phone
+     * every one took 72 to 86 ms (2026-11-27), so logging each would fill the log all night.
      */
-    fun beep() {
+    fun beep(gain: Float) {
         val startNs = SystemClock.elapsedRealtimeNanos()
         if (track.playState != AudioTrack.PLAYSTATE_STOPPED) track.stop()
+        if (gain != currentGain) {
+            track.setVolume(gain)
+            currentGain = gain
+        }
         track.reloadStaticData()
         track.play()
         val tookMs = (SystemClock.elapsedRealtimeNanos() - startNs) / 1_000_000

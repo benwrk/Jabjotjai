@@ -18,9 +18,10 @@ private const val MAX_SLEEP_MS = 200L
  * running all night costs little. Call it from a background dispatcher: [BeatBeeper]'s calls block.
  *
  * @param beats the beats to sound, on the phone's monotonic clock, oldest first; read on each pass
+ * @param gain the beep's gain, read at each beep
  * @throws UnsupportedOperationException if the phone cannot open an audio track
  */
-suspend fun beepAtBeats(beats: () -> List<Long>) {
+suspend fun beepAtBeats(beats: () -> List<Long>, gain: () -> Float) {
     BeatBeeper().use { beeper ->
         var signalled = SystemClock.elapsedRealtimeNanos()
         while (true) {
@@ -28,7 +29,7 @@ suspend fun beepAtBeats(beats: () -> List<Long>) {
             val current = beats()
             val due = current.lastOrNull { it in (signalled + 1)..now }
             if (due != null) {
-                if (now - due < LATE_BEEP_NS) beeper.beep()
+                if (now - due < LATE_BEEP_NS) beeper.beep(gain())
                 signalled = due
             }
             val next = current.firstOrNull { it > maxOf(signalled, now) }

@@ -56,8 +56,10 @@ class ScaleLadder(
  *
  * @param ecgGainIndex the ECG step, in [ScaleLadder.ECG], used while [ecgAuto] is off
  * @param accScaleIndex the accelerometer step, in [ScaleLadder.ACC], used while [accAuto] is off
- * @param beep a beep at each beat while the monitor is on screen
+ * @param beep a beep at each beat while the monitor is on screen: off is muted
+ * @param beepVolume the beep's own level, from 0 to 1, under the media volume; see [beepGain]
  * @param beepInBackground with [beep], keep beeping while the monitor is not on screen as well
+ * @param timeFromStart the timeline's time counts from the capture's start rather than back from live
  */
 data class DisplaySettings(
     val sweep: SweepSpeed = SweepSpeed.MM_25,
@@ -68,7 +70,16 @@ data class DisplaySettings(
     val calibrationPulse: Boolean = true,
     val beep: Boolean = false,
     val beepInBackground: Boolean = false,
+    val beepVolume: Float = 1f,
+    val timeFromStart: Boolean = false,
 )
 
 /** Where a band's middle line sits, in sample units, and which step of its ladder it draws at. */
 data class BandScale(val index: Int, val centre: Int)
+
+/**
+ * The gain the beep is played at: the square of [DisplaySettings.beepVolume], so the slider's lower
+ * half is not nearly as loud as its top, as a straight line from 0 to 1 would be. The phone's media
+ * volume applies on top.
+ */
+val DisplaySettings.beepGain: Float get() = beepVolume * beepVolume

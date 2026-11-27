@@ -101,13 +101,7 @@ fun DisplaySheet(
                 onCheckedChange = { shown -> onChange { it.copy(calibrationPulse = shown) } },
             )
 
-            Toggle(
-                title = stringResource(R.string.display_beep),
-                hint = stringResource(R.string.display_beep_hint),
-                checked = settings.beep,
-                onCheckedChange = { beep -> onChange { it.copy(beep = beep) } },
-            )
-
+            // The beep itself is switched on and its volume set on the playback bar.
             Toggle(
                 title = stringResource(R.string.display_beep_background),
                 hint = stringResource(R.string.display_beep_background_hint),

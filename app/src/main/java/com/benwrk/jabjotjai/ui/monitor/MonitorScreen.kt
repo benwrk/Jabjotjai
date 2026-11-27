@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -133,7 +132,7 @@ fun MonitorScreen(
         val landscape = maxWidth > maxHeight
         val numericsWidth = maxWidth * 0.26f
         Column(Modifier.fillMaxSize()) {
-            StatusBar(live.value.snapshot, running, secondsClock.value, onDisplay = { showDisplaySheet = true }, onStop)
+            StatusBar(live.value.snapshot, running, secondsClock.value, onStop)
             (readError ?: live.value.readError)?.let {
                 Text(
                     stringResource(R.string.monitor_read_error, it),
@@ -154,6 +153,9 @@ fun MonitorScreen(
                 playback = playback.value,
                 startNs = live.value.snapshot.header?.start?.monoNs,
                 nowNs = secondsClock.value,
+                settings = settings.value,
+                onSettings = viewModel::updateDisplaySettings,
+                onOpenSettings = { showDisplaySheet = true },
                 onTogglePause = viewModel::togglePause,
                 onScrub = viewModel::scrub,
                 onSeek = viewModel::endScrub,
@@ -190,7 +192,7 @@ private class Bands(
 }
 
 @Composable
-private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, nowMonoNs: Long, onDisplay: () -> Unit, onStop: () -> Unit) {
+private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, nowMonoNs: Long, onStop: () -> Unit) {
     val (connection, connectionColor) = when (snapshot.connection) {
         RawEvents.CONNECTED -> stringResource(R.string.monitor_connected) to MonitorColors.Ecg
         RawEvents.CONNECTING -> stringResource(R.string.monitor_connecting) to MonitorColors.Warning
@@ -206,7 +208,6 @@ private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, 
         Text(connection, color = connectionColor, style = MaterialTheme.typography.titleSmall)
         Text(elapsedText(snapshot.elapsedSeconds(nowMonoNs) ?: 0), color = MonitorColors.Secondary, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onDisplay) { Text(stringResource(R.string.display_open), color = MonitorColors.Text) }
         OutlinedButton(onClick = onStop, border = BorderStroke(1.dp, MonitorColors.Alarm)) {
             Text(stringResource(R.string.stop), color = MonitorColors.Alarm)
         }

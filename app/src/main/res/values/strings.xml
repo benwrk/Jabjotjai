@@ -57,8 +57,12 @@
     <string name="playback_speed">%1$s×</string>
     <string name="playback_play">Play</string>
     <string name="playback_pause">Pause</string>
+    <string name="playback_beep_mute">Mute the beat beep</string>
+    <string name="playback_beep_unmute">Beep at each beat</string>
+    <string name="playback_beep_volume">Beat beep volume</string>
+    <string name="playback_time_switch">Switch between time behind live and time from the start</string>
 
-    <string name="display_open">Display</string>
+    <string name="display_open">Display settings</string>
     <string name="display_title">Display</string>
     <string name="display_sweep">Sweep speed, mm/s</string>
     <string name="display_ecg_gain">ECG gain</string>
@@ -67,8 +71,6 @@
     <string name="display_gain_step">×%1$s</string>
     <string name="display_pulse">Calibration pulse</string>
     <string name="display_pulse_hint">A 1 mV pulse at the left of the ECG, rising from the line where the trace draws 0 mV.</string>
-    <string name="display_beep">Beat beep</string>
-    <string name="display_beep_hint">One beep for each beat the strap reports, while this screen is on. It follows the media volume.</string>
     <string name="display_beep_background">Keep beeping in the background</string>
     <string name="display_beep_background_hint">Go on beeping when the app is not on screen, with the screen off too, until the capture stops. Uses more battery.</string>
 

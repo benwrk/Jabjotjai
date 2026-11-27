@@ -23,6 +23,8 @@ object DisplaySettingsStore {
     private const val CALIBRATION_PULSE = "calibration_pulse"
     private const val BEEP = "beep"
     private const val BEEP_IN_BACKGROUND = "beep_in_background"
+    private const val BEEP_VOLUME = "beep_volume"
+    private const val TIME_FROM_START = "time_from_start"
 
     private val mutableSettings = MutableStateFlow(DisplaySettings())
     val settings: StateFlow<DisplaySettings> = mutableSettings.asStateFlow()
@@ -57,6 +59,8 @@ object DisplaySettingsStore {
             calibrationPulse = prefs.getBoolean(CALIBRATION_PULSE, defaults.calibrationPulse),
             beep = prefs.getBoolean(BEEP, defaults.beep),
             beepInBackground = prefs.getBoolean(BEEP_IN_BACKGROUND, defaults.beepInBackground),
+            beepVolume = prefs.getFloat(BEEP_VOLUME, defaults.beepVolume).coerceIn(0f, 1f),
+            timeFromStart = prefs.getBoolean(TIME_FROM_START, defaults.timeFromStart),
         )
     }
 
@@ -70,6 +74,8 @@ object DisplaySettingsStore {
             .putBoolean(CALIBRATION_PULSE, settings.calibrationPulse)
             .putBoolean(BEEP, settings.beep)
             .putBoolean(BEEP_IN_BACKGROUND, settings.beepInBackground)
+            .putFloat(BEEP_VOLUME, settings.beepVolume)
+            .putBoolean(TIME_FROM_START, settings.timeFromStart)
             .apply()
     }
 }
