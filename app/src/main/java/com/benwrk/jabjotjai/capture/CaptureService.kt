@@ -95,25 +95,51 @@ class CaptureService : Service() {
                 sensorId = requireNotNull(intent.getStringExtra(EXTRA_SENSOR_ID)),
                 sensorName = requireNotNull(intent.getStringExtra(EXTRA_SENSOR_NAME)),
                 sensorAddress = requireNotNull(intent.getStringExtra(EXTRA_SENSOR_ADDRESS)),
+                continues = intent.getStringExtra(EXTRA_CONTINUES),
             )
             ACTION_STOP -> stop(STOP_BY_USER)
+            // A null intent is Android re-creating the service after killing its process
+            // (START_STICKY, below): resume if nobody chose that stop (decision 0013).
+            null -> if (!running) resumeAfterRestart(startId)
             else -> if (!running) stopSelf(startId)
         }
-        // A capture is not resumed after the process dies: 0.1 has no way to continue a session.
-        return START_NOT_STICKY
+        // Re-created if its process is killed while it is started (Service.START_STICKY).
+        return START_STICKY
     }
 
-    private fun start(sensorId: String, sensorName: String, sensorAddress: String) {
+    private fun resumeAfterRestart(startId: Int) {
+        val unclean = CaptureRecovery.find(this)
+        if (unclean == null || !unclean.resumesByItself) {
+            // Nothing to resume, or something the user is asked about when they next open the app.
+            stopSelf(startId)
+            return
+        }
+        val previous = unclean.capture
+        start(previous.sensorId, previous.sensorName, previous.sensorAddress, continues = previous.session)
+    }
+
+    /** @param continues the session this capture resumes, if it resumes one */
+    private fun start(sensorId: String, sensorName: String, sensorAddress: String, continues: String? = null) {
         if (running) return
         running = true
         DisplaySettingsStore.init(this)
         val clock = SystemPhoneClock
         val start = clock.stamp()
-        startForeground(
-            NOTIFICATION_ID,
-            notification(NotificationContent.STARTING),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
-        )
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                notification(NotificationContent.STARTING),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+            )
+        } catch (e: IllegalStateException) {
+            // Android refused to start it in the foreground from the background, which battery
+            // optimisation may cause. The capture stays remembered, so the app offers to resume
+            // it when next opened (decision 0013).
+            Log.w(TAG, "could not start in the foreground", e)
+            running = false
+            stopSelf()
+            return
+        }
         wakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Jabjotjai:capture")
             .apply { acquire() }
@@ -121,7 +147,8 @@ class CaptureService : Service() {
         val api = PolarApi.get(this)
         val sessionId = SessionNames.newId(start.wallMs)
         val file = SessionNames.rawFile(File(filesDir, RAW_DIRECTORY), sessionId)
-        val header = header(sessionId, start, Sensor(id = sensorId, name = sensorName, address = sensorAddress))
+        val header = header(sessionId, start, Sensor(id = sensorId, name = sensorName, address = sensorAddress), continues)
+        RunningCaptureStore.save(this, RunningCapture(sessionId, file, sensorId, sensorName, sensorAddress))
 
         scope.launch {
             val newSession = CaptureSession(RawWriter.create(file, clock::monoNs))
@@ -164,6 +191,8 @@ class CaptureService : Service() {
         } else if (currentSession != null && !currentSession.ended) {
             currentSession.end(SystemPhoneClock.stamp(), reason)
         }
+        // Ended with its `end` record: nothing to note or resume.
+        RunningCaptureStore.clear(this)
     }
 
     /** Any failure on the capture thread ends the capture, loudly: it is published, never swallowed. */
@@ -208,7 +237,7 @@ class CaptureService : Service() {
         super.onDestroy()
     }
 
-    private fun header(sessionId: String, start: Stamp, sensor: Sensor): HeaderRecord {
+    private fun header(sessionId: String, start: Stamp, sensor: Sensor, continues: String?): HeaderRecord {
         val packageInfo = packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
         return HeaderRecord(
             schema = RAW_SCHEMA,
@@ -219,6 +248,7 @@ class CaptureService : Service() {
             start = start,
             sensor = sensor,
             sensorEpoch = "2000-01-01",
+            continues = continues,
         )
     }
 
@@ -380,6 +410,7 @@ class CaptureService : Service() {
         private const val EXTRA_SENSOR_ID = "sensor_id"
         private const val EXTRA_SENSOR_NAME = "sensor_name"
         private const val EXTRA_SENSOR_ADDRESS = "sensor_address"
+        private const val EXTRA_CONTINUES = "continues"
         private const val CHANNEL_ID = "capture"
         private const val NOTIFICATION_ID = 1
         private const val SYNC_TICK_MS = 1_000L
@@ -398,12 +429,13 @@ class CaptureService : Service() {
         const val STOP_ON_ERROR = "error"
         const val STOP_SERVICE_DESTROYED = "service_destroyed"
 
-        fun startIntent(context: Context, sensorId: String, sensorName: String, sensorAddress: String): Intent =
+        fun startIntent(context: Context, sensorId: String, sensorName: String, sensorAddress: String, continues: String? = null): Intent =
             Intent(context, CaptureService::class.java)
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_SENSOR_ID, sensorId)
                 .putExtra(EXTRA_SENSOR_NAME, sensorName)
                 .putExtra(EXTRA_SENSOR_ADDRESS, sensorAddress)
+                .putExtra(EXTRA_CONTINUES, continues)
 
         fun stopIntent(context: Context): Intent = Intent(context, CaptureService::class.java).setAction(ACTION_STOP)
     }

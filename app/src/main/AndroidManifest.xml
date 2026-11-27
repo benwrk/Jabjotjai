@@ -52,6 +52,18 @@
             android:name=".capture.CaptureService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- Resumes a capture an app update interrupted (decision 0013). Exported so the system's
+             broadcast reaches it: MY_PACKAGE_REPLACED "is only sent to the application that was
+             replaced" and "is a protected intent that can only be sent by the system"
+             (Intent.ACTION_MY_PACKAGE_REPLACED, SDK 37 source, read 2026-11-27). -->
+        <receiver
+            android:name=".capture.UpdateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

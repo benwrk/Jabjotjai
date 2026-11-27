@@ -89,6 +89,13 @@ object Capture {
         context.startForegroundService(CaptureService.startIntent(context, sensorId, sensorName, sensorAddress))
     }
 
+    /** Starts a new capture with [previous]'s strap, whose file names [previous] as the capture it continues. */
+    fun resume(context: Context, previous: RunningCapture) {
+        context.startForegroundService(
+            CaptureService.startIntent(context, previous.sensorId, previous.sensorName, previous.sensorAddress, continues = previous.session),
+        )
+    }
+
     fun stop(context: Context) {
         context.startService(CaptureService.stopIntent(context))
     }

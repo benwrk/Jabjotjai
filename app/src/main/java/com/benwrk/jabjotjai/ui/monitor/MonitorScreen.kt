@@ -1,5 +1,6 @@
 package com.benwrk.jabjotjai.ui.monitor
 
+import android.os.PowerManager
 import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -411,6 +412,12 @@ private fun Details(heartRate: HeartRate?, snapshot: MonitorSnapshot, beepError:
         snapshot.batteryPct?.let { Text(stringResource(R.string.monitor_battery, it), color = MonitorColors.Secondary) }
         Text(stringResource(R.string.monitor_gaps, snapshot.gaps), color = if (snapshot.gaps > 0) MonitorColors.Warning else MonitorColors.Secondary)
         beepError?.let { Text(stringResource(R.string.monitor_beep_unavailable, it), color = MonitorColors.Warning) }
+        // Battery optimisation may refuse the restart that resumes a capture Android stopped
+        // (decision 0013); said here so it can be turned off before a night's recording.
+        val context = LocalContext.current
+        if (!context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)) {
+            Text(stringResource(R.string.monitor_battery_optimised), color = MonitorColors.Warning)
+        }
     }
 }
 

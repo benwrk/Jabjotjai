@@ -17,6 +17,18 @@
     <string name="picker_failed">The last capture stopped: %1$s</string>
     <string name="picker_rssi">%1$s · %2$d dBm</string>
 
+    <string name="resume_title">The last capture stopped</string>
+    <string name="resume_body_at">The capture with %1$s stopped at %2$s: %3$s. Resume it with the same strap? Its recording is kept, and the time between is shown as a gap.</string>
+    <string name="resume_body">The capture with %1$s stopped: %2$s. Resume it with the same strap? Its recording is kept, and the time between is shown as a gap.</string>
+    <string name="resume_why_system">Android stopped the app</string>
+    <string name="resume_why_updated">the app was updated</string>
+    <string name="resume_why_force_stopped">the app was force-stopped</string>
+    <string name="resume_why_task_manager">it was stopped from the task manager</string>
+    <string name="resume_why_crashed">the app stopped working</string>
+    <string name="resume_why_unknown">the app was stopped</string>
+    <string name="resume_resume">Resume</string>
+    <string name="resume_dismiss">Dismiss</string>
+
     <string name="monitor_hr">HR</string>
     <string name="monitor_bpm">bpm</string>
     <string name="monitor_rr">RR %1$d ms</string>
@@ -36,6 +48,7 @@
     <string name="monitor_auto">· auto</string>
     <string name="monitor_read_error">Cannot read the raw file: %1$s</string>
     <string name="monitor_beep_unavailable">No beep: %1$s</string>
+    <string name="monitor_battery_optimised">Battery optimisation is on: Android may stop an overnight capture</string>
 
     <string name="playback_live">LIVE</string>
     <string name="playback_behind">−%1$s</string>

@@ -55,4 +55,14 @@ object RawCodec {
             RawLine.Malformed(line, e.message ?: "does not match type \"$type\"")
         }
     }
+
+    /** An [EndingNote] as the one line of its file, without a trailing newline. */
+    fun encode(note: EndingNote): String = json.encodeToString(EndingNote.serializer(), note)
+
+    /** Reads an ending note's line, or returns null if it is not one. */
+    fun decodeEnding(line: String): EndingNote? = try {
+        json.decodeFromString(EndingNote.serializer(), line)
+    } catch (e: IllegalArgumentException) {
+        null
+    }
 }

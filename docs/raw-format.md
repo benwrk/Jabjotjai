@@ -55,6 +55,10 @@ such as `20261127T091530Z-3f9a`, so a directory listing sorts by time.
 Each record is written through to the operating system as one write as soon as it exists, so a
 reader tailing the file sees it at once. A sync to storage follows within a second.
 
+A capture the app did not end itself, because Android stopped its process, has no `end` record.
+From schema 1.2, the next time the app starts it writes `files/raw/<session>.ending.json` beside
+such a file, saying how it ended (see "Schema 1.2"), and the file itself stays as it was.
+
 ## Schema 1.0
 
 First written by app 0.1.0.
@@ -159,3 +163,35 @@ First written by app 0.1.0. Everything in 1.0, plus:
 - **`header.sensor.address`** (string): the Bluetooth address the capture connected to, as the scan
   saw the strap advertising. A phone can hold more than one bond for the same strap, at different
   addresses; this says which one the data came through. Absent in 1.0 files.
+
+## Schema 1.2
+
+First written by app 0.3.0. Everything in 1.1, plus:
+
+- **`header.continues`** (string): the `session` of the capture this one resumes, when the app
+  resumed a capture it did not end itself (decision `0013`). The time between the end of that
+  file and the start of this one is a gap, never stitched across. Absent when a capture was
+  started afresh, and in earlier files.
+
+### The ending note: `<session>.ending.json`
+
+Not a record of the raw file: a file of its own beside it, one line of JSON, written when the app
+next starts after a capture it did not end. A raw file with an `end` record has none. Fields:
+
+- **`type`**: `"ending"`.
+- **`schema`**: the schema version of the app that wrote the note.
+- **`session`**: the `session` of the raw file it describes.
+- **`noted_wall_ms`**: when the note was written, on the phone's wall clock. Hours can pass
+  between the capture stopping and the app starting again.
+- **`last_line`** (`wall_ms`, `mono_ns`): the receive time of the raw file's last complete line,
+  the last moment the capture is known to have been running. Absent if the file has no complete
+  line after its header.
+- **`exit`**: Android's record of why the app's process ended (`android.app.ApplicationExitInfo`):
+  - **`reason`**: the reason's name without its `REASON_` prefix, such as `LOW_MEMORY`,
+    `USER_REQUESTED` (Force stop), `USER_STOPPED`, `PACKAGE_UPDATED` or `CRASH`;
+  - **`reason_code`**: its number, kept because a later Android may add a reason this app
+    cannot name, in which case `reason` is `"UNKNOWN_<code>"`;
+  - **`wall_ms`**: when the process ended;
+  - **`description`**: anything Android added, if it added anything.
+
+  Absent if Android kept no record of that process.

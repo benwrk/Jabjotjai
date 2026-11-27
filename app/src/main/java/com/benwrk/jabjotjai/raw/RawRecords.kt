@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  * `docs/raw-format.md`. The minor number grows for additive changes, the major number for any
  * change a reader of the previous version would misread.
  */
-const val RAW_SCHEMA: String = "1.1"
+const val RAW_SCHEMA: String = "1.2"
 
 /**
  * One line of a raw file. The serialised form of each subtype is the file format, so within one
@@ -55,6 +55,11 @@ data class HeaderRecord(
     val sensor: Sensor,
     /** The date sensor timestamps count from. The SDK documents the date but not a time zone. */
     @SerialName("sensor_epoch") val sensorEpoch: String,
+    /**
+     * The `session` of the capture this one resumes, when the app resumed a capture it did not end
+     * itself; absent for a fresh start (schema 1.2, decision `0013`).
+     */
+    val continues: String? = null,
 ) : RawRecord
 
 /** Something that happened to the connection or to a stream. Fields that do not apply are absent. */
@@ -199,3 +204,41 @@ data class EndRecord(
     /** Gaps still open when the file was closed. */
     @SerialName("open_gaps") val openGaps: List<GapRecord> = emptyList(),
 ) : RawRecord
+
+/**
+ * How a capture ended that the app did not end itself, written when the app next started, to
+ * `<session>.ending.json` beside the raw file, which is never reopened (schema 1.2, decision
+ * `0013`). Not a record of the raw file: a file of its own, one line.
+ *
+ * @param lastLine the receive time of the raw file's last complete line
+ * @param exit why Android ended the app's process, as it recorded it; absent if it kept no record
+ */
+@Serializable
+data class EndingNote(
+    val type: String = TYPE,
+    val schema: String = RAW_SCHEMA,
+    val session: String,
+    @SerialName("noted_wall_ms") val notedWallMs: Long,
+    @SerialName("last_line") val lastLine: Stamp? = null,
+    val exit: ProcessExit? = null,
+) {
+    companion object {
+        const val TYPE = "ending"
+    }
+}
+
+/**
+ * Android's record of why a process ended (`android.app.ApplicationExitInfo`).
+ *
+ * @param reason the reason's name without its `REASON_` prefix, such as `LOW_MEMORY` or `USER_REQUESTED`
+ * @param reasonCode the reason's number, kept in case a later Android adds a reason this build cannot name
+ * @param wallMs when it ended, on the phone's wall clock
+ * @param description what Android added, if anything
+ */
+@Serializable
+data class ProcessExit(
+    val reason: String,
+    @SerialName("reason_code") val reasonCode: Int,
+    @SerialName("wall_ms") val wallMs: Long,
+    val description: String? = null,
+)

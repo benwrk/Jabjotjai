@@ -86,7 +86,10 @@ cannot end itself properly; it is noted and resumed afterwards instead.
    its file, which is never reopened: why it ended, from Android's record of why the app's
    process died, and the last moment the file received.
 2. **It resumes by itself when nobody chose the stop**: after Android stops the app to free
-   memory, and after the app is updated.
+   memory, and after the app is updated. If Android refuses the restart, which battery
+   optimisation may cause, the app offers to resume instead, as below. While battery optimisation
+   is on, the monitor says so during a capture, so the user can turn it off before an overnight
+   recording.
 3. **The app offers to resume when someone did**: after Force stop, a stop from the task manager,
    or a crash, when the app is next opened.
 4. **A resumed capture is a new file** whose header names the capture it continues, connecting

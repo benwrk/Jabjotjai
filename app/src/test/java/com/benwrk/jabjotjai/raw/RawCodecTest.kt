@@ -12,15 +12,43 @@ class RawCodecTest {
 
     @Test
     fun headerIsWrittenWithTypeFirstAndTheDocumentedFieldNames() {
-        // Schema 1.1: the sensor object gained `address` (docs/raw-format.md, "Schema 1.1").
+        // Schema 1.1: the sensor object gained `address` (docs/raw-format.md, "Schema 1.1"). Schema
+        // 1.2 added only `continues`, which a fresh capture leaves out, so only the number moved.
         assertEquals(
-            """{"type":"header","schema":"1.1","session":"20261127T091530Z-3f9a","app":"0.1.0 (1000)",""" +
+            """{"type":"header","schema":"1.2","session":"20261127T091530Z-3f9a","app":"0.1.0 (1000)",""" +
                 """"sdk":"9.0.0","phone":{"make":"samsung","model":"SM-S931B","android":"16","api":36},""" +
                 """"start":{"wall_ms":1795766523219,"mono_ns":81234567890123},""" +
                 """"sensor":{"id":"A1B2C3D4","name":"Polar H10 A1B2C3D4","address":"00:11:22:33:44:55"},""" +
                 """"sensor_epoch":"2000-01-01"}""",
             RawCodec.encode(Samples.header),
         )
+    }
+
+    @Test
+    fun aResumedCapturesHeaderNamesTheCaptureItContinues() {
+        val header = Samples.header.copy(continues = "20261127T080000Z-0a1b")
+        val text = RawCodec.encode(header)
+        assertTrue(text, text.endsWith(""""sensor_epoch":"2000-01-01","continues":"20261127T080000Z-0a1b"}"""))
+        assertEquals(RawLine.Record(header), RawCodec.decode(text))
+    }
+
+    @Test
+    fun anEndingNoteIsWrittenWithTheDocumentedFieldNamesAndReadBack() {
+        val note = EndingNote(
+            session = "20261127T091530Z-3f9a",
+            notedWallMs = 1795770000000,
+            lastLine = Stamp(wallMs = 1795769000000, monoNs = 81300000000000),
+            exit = ProcessExit(reason = "LOW_MEMORY", reasonCode = 3, wallMs = 1795769000500),
+        )
+        val text = RawCodec.encode(note)
+        assertEquals(
+            """{"type":"ending","schema":"1.2","session":"20261127T091530Z-3f9a","noted_wall_ms":1795770000000,""" +
+                """"last_line":{"wall_ms":1795769000000,"mono_ns":81300000000000},""" +
+                """"exit":{"reason":"LOW_MEMORY","reason_code":3,"wall_ms":1795769000500}}""",
+            text,
+        )
+        assertEquals(note, RawCodec.decodeEnding(text))
+        assertEquals(null, RawCodec.decodeEnding("""{"type":"header"}"""))
     }
 
     @Test
