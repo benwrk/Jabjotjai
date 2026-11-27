@@ -366,7 +366,6 @@ class CaptureService : Service() {
             getString(R.string.capture_notification_read_error)
         } else {
             listOfNotNull(
-                content.rrMs?.let { getString(R.string.capture_notification_rr, it) },
                 getString(R.string.monitor_gaps, content.gaps),
                 content.batteryPercentage?.let { getString(R.string.monitor_battery, it) },
                 getString(
@@ -385,7 +384,7 @@ class CaptureService : Service() {
             ?: Icon.createWithResource(this, R.drawable.ic_stat_capture)
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(icon)
-            .setContentTitle(getString(R.string.capture_notification_title, heartRate, connection))
+            .setContentTitle(listOfNotNull(heartRate, content.rrMs?.let { getString(R.string.capture_notification_rr, it) }, connection).joinToString(" · "))
             .setContentText(details)
             // The elapsed time is part of the text instead of the system's chronometer: One UI drew
             // that against the end of the title, as "HR 72 bpm06:52" (seen 2026-11-27).

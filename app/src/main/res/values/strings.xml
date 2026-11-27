@@ -91,7 +91,6 @@
 
     <string name="capture_notification_hr">%1$d bpm</string>
     <string name="capture_notification_hr_none">— bpm</string>
-    <string name="capture_notification_title">%1$s · %2$s</string>
     <string name="capture_notification_rr">RR %1$d ms</string>
     <string name="capture_notification_contact">Contact %1$s</string>
     <string name="capture_notification_chip">HR %1$d</string>
