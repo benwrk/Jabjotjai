@@ -93,14 +93,31 @@ fun DisplaySheet(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.display_beep), style = MaterialTheme.typography.titleSmall)
-                    Text(stringResource(R.string.display_beep_hint), color = MonitorColors.Secondary, style = MaterialTheme.typography.bodySmall)
-                }
-                Switch(checked = settings.beep, onCheckedChange = { beep -> onChange { it.copy(beep = beep) } })
-            }
+            Toggle(
+                title = stringResource(R.string.display_pulse),
+                hint = stringResource(R.string.display_pulse_hint),
+                checked = settings.calibrationPulse,
+                onCheckedChange = { shown -> onChange { it.copy(calibrationPulse = shown) } },
+            )
+
+            Toggle(
+                title = stringResource(R.string.display_beep),
+                hint = stringResource(R.string.display_beep_hint),
+                checked = settings.beep,
+                onCheckedChange = { beep -> onChange { it.copy(beep = beep) } },
+            )
         }
+    }
+}
+
+@Composable
+private fun Toggle(title: String, hint: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(hint, color = MonitorColors.Secondary, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

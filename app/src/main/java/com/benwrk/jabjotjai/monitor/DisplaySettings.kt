@@ -63,6 +63,7 @@ data class DisplaySettings(
     val ecgGainIndex: Int = ScaleLadder.ECG.standardIndex,
     val accAuto: Boolean = true,
     val accScaleIndex: Int = ScaleLadder.ACC.standardIndex,
+    val calibrationPulse: Boolean = true,
     val beep: Boolean = false,
 )
 

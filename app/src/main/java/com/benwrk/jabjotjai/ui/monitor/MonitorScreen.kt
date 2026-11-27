@@ -44,7 +44,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -205,12 +204,7 @@ private fun EcgBand(bands: Bands, modifier: Modifier) {
         plainNumber(gain),
         plainNumber(bands.settings.value.sweep.mmPerSecond),
     ) + if (bands.settings.value.ecgAuto) " " + stringResource(R.string.monitor_auto) else ""
-    Band(
-        label = { Text(label, color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall) },
-        bands = bands,
-        modifier = modifier,
-        margin = { CalibrationPulse(bands, Modifier.fillMaxSize()) },
-    ) {
+    Band(label = { Text(label, color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall) }, modifier) {
         SweepTrace(
             snapshot = bands.snapshot,
             nowMonoNs = bands.frameClock,
@@ -222,6 +216,7 @@ private fun EcgBand(bands: Bands, modifier: Modifier) {
             offsetPx = bandOffset(ScaleLadder.ECG, bands.ecgScale, bands.pxPerMm),
             modifier = Modifier.fillMaxSize(),
         )
+        if (bands.settings.value.calibrationPulse) CalibrationPulse(bands, Modifier.fillMaxSize())
     }
 }
 
@@ -243,7 +238,7 @@ private fun AccBand(bands: Bands, modifier: Modifier) {
         }
         withStyle(SpanStyle(color = MonitorColors.Text)) { append(" $scaleText") }
     }
-    Band(label = { Text(label, style = MaterialTheme.typography.labelSmall) }, bands = bands, modifier = modifier) {
+    Band(label = { Text(label, style = MaterialTheme.typography.labelSmall) }, modifier) {
         val offset = bandOffset(ScaleLadder.ACC, bands.accScale, bands.pxPerMm)
         for (axis in ACC_AXES) {
             SweepTrace(
@@ -275,44 +270,29 @@ private fun bandOffset(ladder: ScaleLadder, scale: State<BandScale>, pxPerMm: Fl
     (value - current.centre) * ladder.mmPerSample(current.index) * pxPerMm
 }
 
-/**
- * One waveform band: a margin at the left that the sweep never draws over, then the traces, with
- * the label at the top left and a thin rule below. Every band has the same margin, set by the
- * calibration pulse's width, so the bands stay aligned in time.
- */
+/** One waveform band: its traces across the full width, the label at the top left and a thin rule below. */
 @Composable
-private fun Band(
-    label: @Composable () -> Unit,
-    bands: Bands,
-    modifier: Modifier,
-    margin: @Composable () -> Unit = {},
-    content: @Composable () -> Unit,
-) {
-    val marginWidth = with(LocalDensity.current) { (pulseMarginMm(bands.mmPerSecond()) * bands.pxPerMm).toDp() }
+private fun Band(label: @Composable () -> Unit, modifier: Modifier, content: @Composable () -> Unit) {
     Box(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxSize()) {
-            Box(Modifier.width(marginWidth).fillMaxHeight()) { margin() }
-            Box(Modifier.weight(1f).fillMaxHeight()) { content() }
-        }
+        content()
         Box(Modifier.padding(start = 8.dp, top = 2.dp)) { label() }
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(MonitorColors.Divider))
     }
 }
 
-/** The space either side of the calibration pulse in the band's margin. */
-private const val PULSE_SIDE_MM = 2f
+/** Where the calibration pulse starts, from the band's left edge, and how far its feet reach either side. */
+private const val PULSE_LEFT_MM = 3f
+private const val PULSE_FOOT_MM = 1.5f
 
 /** The calibration pulse lasts 0.2 s, as on ECG paper. */
 private const val PULSE_SECONDS = 0.2f
 
-private fun pulseMarginMm(mmPerSecond: Float): Float = PULSE_SECONDS * mmPerSecond + 2 * PULSE_SIDE_MM
-
 /**
- * The 1 mV calibration pulse, 0.2 s wide, at the band's current gain and sweep speed. It rises
- * from the line where the trace draws 0 mV, so a wave can be held up against it: the band's middle
- * at a fixed gain, and wherever automatic scaling has moved the trace otherwise. If 0 mV is off
- * the band it stands on the edge instead, and where 1 mV is taller than the room under the label
- * its top is cut there and marked as clipped, like the trace.
+ * The 1 mV calibration pulse, 0.2 s wide, at the band's current gain and sweep speed, drawn over
+ * the left of the trace. It rises from the line where the trace draws 0 mV, so a wave can be held
+ * up against it: the band's middle at a fixed gain, and wherever automatic scaling has moved the
+ * trace otherwise. If 0 mV is off the band it stands on the edge instead, and where 1 mV is taller
+ * than the room under the label its top is cut there and marked as clipped, like the trace.
  */
 @Composable
 private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
@@ -325,15 +305,16 @@ private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
         val zero = (size.height / 2f + scale.centre * pxPerMicrovolt).coerceIn(ceiling, floor)
         val height = 1_000 * pxPerMicrovolt
         val top = maxOf(zero - height, ceiling)
-        val left = PULSE_SIDE_MM * bands.pxPerMm
+        val left = PULSE_LEFT_MM * bands.pxPerMm
         val right = left + PULSE_SECONDS * bands.mmPerSecond() * bands.pxPerMm
+        val foot = PULSE_FOOT_MM * bands.pxPerMm
         val path = Path().apply {
-            moveTo(0f, zero)
+            moveTo(left - foot, zero)
             lineTo(left, zero)
             lineTo(left, top)
             lineTo(right, top)
             lineTo(right, zero)
-            lineTo(size.width, zero)
+            lineTo(right + foot, zero)
         }
         drawPath(path, MonitorColors.Ecg.copy(alpha = 0.6f), style = Stroke(width = 1.dp.toPx()))
         if (zero - height < ceiling) {
