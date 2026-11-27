@@ -9,6 +9,12 @@ activityCompose = "1.8.0"
 kotlin = "2.2.10"
 composeBom = "2026.02.01"
 polarBleSdk = "9.0.0"
+# The newest release built against kotlin-stdlib 2.2, the Kotlin this build compiles with. 1.12.0 and
+# later are built against 2.4 and fail to compile here with "binary version of its metadata is 2.4.0,
+# expected version is 2.2.0" (observed 2026-11-27). Raise it together with the Kotlin version.
+kotlinxSerialization = "1.9.0"
+# The version the Polar BLE SDK itself depends on, so the app and the SDK share one copy.
+kotlinxCoroutines = "1.10.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -26,8 +32,11 @@ androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 polar-ble-sdk = { group = "com.github.polarofficial", name = "polar-ble-sdk", version.ref = "polarBleSdk" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 

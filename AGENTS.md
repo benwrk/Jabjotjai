@@ -12,13 +12,14 @@ or enforce what this file and `docs/` say, and hold no project knowledge of thei
 
 Everything else lives where it loads on demand:
 
-| Knowledge                                | Home              | How it loads                                         |
-| ---------------------------------------- | ----------------- | ---------------------------------------------------- |
-| What the app must do, version by version | `docs/spec.md`    | Read before changing behaviour                       |
-| Durable facts that are not area-specific | `docs/memories/`  | Index below is imported; entries read on demand      |
-| Area-specific constraints                | `docs/rules/`     | Read before working in that area; see below          |
-| Decisions and their rejected options     | `docs/decisions/` | Searched, never loaded                               |
-| Work that is known to be outstanding     | `docs/backlog.md` | Read when choosing what to do next; curated, so true |
+| Knowledge                                | Home                 | How it loads                                         |
+| ---------------------------------------- | -------------------- | ---------------------------------------------------- |
+| What the app must do, version by version | `docs/spec.md`       | Read before changing behaviour                       |
+| The raw file format, every schema        | `docs/raw-format.md` | Read before writing or reading raw files             |
+| Durable facts that are not area-specific | `docs/memories/`     | Index below is imported; entries read on demand      |
+| Area-specific constraints                | `docs/rules/`        | Read before working in that area; see below          |
+| Decisions and their rejected options     | `docs/decisions/`    | Searched, never loaded                               |
+| Work that is known to be outstanding     | `docs/backlog.md`    | Read when choosing what to do next; curated, so true |
 
 **Nothing durable goes in a private agent memory store** — no agent memory directory, no
 per-user notes file, nothing outside the tree that only one tool can see. Facts about the
@@ -33,9 +34,10 @@ every session.** Claude Code loads it through the import below.
 
 ## Rules — read the one for the area before you touch it
 
-| Working on                                                                      | Read first                                           |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `docs/decisions/**`, `docs/rules/**`, `docs/memories/**`, `.claude/`, this file | [`docs/rules/decisions.md`](docs/rules/decisions.md) |
+| Working on                                                                      | Read first                                             |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `docs/decisions/**`, `docs/rules/**`, `docs/memories/**`, `.claude/`, this file | [`docs/rules/decisions.md`](docs/rules/decisions.md)   |
+| `app/src/*/java/com/benwrk/jabjotjai/raw/**`, `docs/raw-format.md`              | [`docs/rules/raw-format.md`](docs/rules/raw-format.md) |
 
 Each rule lives once, in `docs/rules/`. For Claude Code, `.claude/rules/<area>.md` carries the
 same paths and a one-line pointer to the rule, which appears when a matching file is touched.
