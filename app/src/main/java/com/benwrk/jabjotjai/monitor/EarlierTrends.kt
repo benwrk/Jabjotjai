@@ -7,7 +7,12 @@ import com.benwrk.jabjotjai.raw.RawTail
 import java.io.File
 import kotlin.math.abs
 
-/** How far back heart-rate and RR rows can look: six rows of an hour each. */
+/**
+ * How far back heart-rate and RR rows can look: six rows of an hour each. Reading that far back
+ * holds up the capture's reader once, when a capture resumes: on the test phone (Galaxy S25)
+ * reading went at 60 to 70 MB a second (a 36 MB recording of about an hour in 0.5 to 0.6 s, a
+ * chain of six files and 20 MB in 0.55 s, 2026-11-27), so six hours, about 220 MB, takes 3 to 4 s.
+ */
 const val TREND_HISTORY_NS: Long = 6 * 60 * 60_000_000_000L
 
 /**
