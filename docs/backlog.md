@@ -473,11 +473,9 @@ derived overlays are stamped in.
   a stale stream, a restart after reconnecting.
 - Untested: the order of several earlier files, the 6 h bound and `unreadable` above zero;
   `ArrivalDelay` letting frames older than 30 s go; `SampleSeries` growing after a trim.
-- `ExampleUnitTest` asserts that 2 + 2 is 4, and `ExampleInstrumentedTest` is the template's.
 
 Done when a reference recording with a disconnection and a gap is in `raw-reference` (identifiers
-replaced), each listed case has a test that fails when the code is broken on purpose, and the
-template tests are gone.
+replaced), and each listed case has a test that fails when the code is broken on purpose.
 
 ## Tidy the comments, docs and leftovers
 
@@ -494,8 +492,8 @@ template tests are gone.
   the numerics on the right" and "the two layouts" in `MonitorScreen`, "(0.6)" used as shorthand
   in comments.
 - Template leftovers: `Theme.kt`'s purple schemes and dynamic colour, which colour the Stop
-  dialog's button and the sheet's chips; `colors.xml`, unused; `backup_rules.xml`, which applies
-  only up to Android 11; the unused string `monitor_battery_optimised`.
+  dialog's button and the sheet's chips; and `backup_rules.xml`, which applies only up to Android
+  11.
 - Calls Material 3 1.5 deprecates: `rememberModalBottomSheetState` in `DisplaySheet` and the
   `ListItem` taking `headlineContent` in `DevicePickerScreen`; both still work.
 - Names: `raf`, `prefs`, `dir`, `mid` (`AGENTS.md`: whole words).
