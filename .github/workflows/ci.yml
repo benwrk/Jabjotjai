@@ -1,8 +1,9 @@
 # Builds, unit-tests and lints every push to master and every pull request, checks that both APKs
 # are signed with the project's stable key (decision 0010), and keeps the debug APK as a
-# downloadable artifact. A version tag (vMAJOR.MINOR.PATCH) on a commit already on master does the
-# same, then attaches both APKs to a draft GitHub Release, which the owner publishes. Decision 0011
-# records the choices made here.
+# downloadable artifact. It also checks that the commits each brings in have subjects in the form
+# the release notes are generated from (decision 0012). A version tag (vMAJOR.MINOR.PATCH) on a
+# commit already on master builds the same way, then attaches both APKs to a draft GitHub Release
+# with generated notes, which the owner publishes. Decision 0011 records the choices made here.
 #
 # Signing needs four repository secrets, under Settings > Secrets and variables > Actions:
 #   SIGNING_KEYSTORE        the keystore file, base64-encoded
@@ -33,6 +34,35 @@ env:
   SIGNING_CERT_SHA256: 325a1e6688323ec147ea2eeb2dcd2c44d900b1e4301d2c996735863fcb5b4799
 
 jobs:
+  # The commit-msg hook checks each subject as it is written, but a hook can be skipped or not
+  # installed, so the commits a push or pull request brings in are checked here as well. A tag
+  # brings in no commits of its own.
+  commits:
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the commit subjects
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            range="$BASE..$HEAD_SHA"
+          elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            range="$BEFORE..$GITHUB_SHA"
+          else
+            echo "::warning::The commit before this push is not in the history, so only $GITHUB_SHA is checked."
+            range="$GITHUB_SHA^!"
+          fi
+          sh scripts/commits.sh check "$range"
+
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -154,7 +184,12 @@ jobs:
           fi
           cp "$release" "dist/jabjotjai-$version.apk"
           cp "$debug" "dist/jabjotjai-$version-debug.apk"
-          cat > dist/notes.md <<EOF
+          # The changes since the previous version tag, generated from the commit subjects.
+          sh scripts/commits.sh notes "$GITHUB_REF_NAME" > dist/notes.md
+          cat >> dist/notes.md <<EOF
+
+          ---
+
           Built from \`$(git rev-parse HEAD)\` by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID.
 
           Both APKs are signed with the project's key, whose certificate has the SHA-256 digest \`$SIGNING_CERT_SHA256\`.

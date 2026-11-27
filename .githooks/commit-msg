@@ -1,5 +1,5 @@
 #!/bin/sh
-# Keep commit messages free of attribution trailers.
+# Keep commit messages free of attribution trailers, and hold their subjects to one form.
 #
 # AGENTS.md requires a one-line subject with no trailers, but coding-agent harnesses
 # append a "Co-Authored-By:" line, a "Generated with Claude Code" line or a
@@ -9,6 +9,11 @@
 # It strips rather than rejects, so an appended line never blocks a commit. A message
 # with no such line is not rewritten at all. See decision 0002.
 #
+# It then rejects a subject that is not in the form type(scope): description, since the
+# release notes are generated from subjects (scripts/commits.sh, decision 0012). Merge
+# subjects written by git, and the fixup!, squash! and amend! subjects that
+# `git rebase --autosquash` consumes, are let through.
+#
 # Installed through git's core.hooksPath, which points at this directory.
 msg_file="$1"
 [ -n "$msg_file" ] && [ -f "$msg_file" ] || exit 0
@@ -17,8 +22,20 @@ pattern='^[[:space:]]*(Co-Authored-By|Claude-Session):|Generated with \[?Claude 
 
 # Only POSIX grep options, so the hook behaves the same under Git for Windows, Linux and
 # macOS. grep exits 1 when it selects no lines, which is not an error here.
-grep -i -E -q -e "$pattern" "$msg_file" || exit 0
-cleaned="$msg_file.noattribution"
-grep -v -i -E -e "$pattern" "$msg_file" > "$cleaned"
-[ $? -le 1 ] || { rm -f "$cleaned"; exit 0; }
-mv "$cleaned" "$msg_file"
+if grep -i -E -q -e "$pattern" "$msg_file"; then
+    cleaned="$msg_file.noattribution"
+    grep -v -i -E -e "$pattern" "$msg_file" > "$cleaned"
+    if [ $? -le 1 ]; then
+        mv "$cleaned" "$msg_file"
+    else
+        rm -f "$cleaned"
+    fi
+fi
+
+# The subject is the first line that is neither blank nor a comment git will remove. An
+# empty message is left for git itself to refuse.
+subject=$(grep -v -E -e '^[[:space:]]*(#|$)' "$msg_file" | head -n 1)
+case "$subject" in
+    '' | 'Merge '* | 'fixup! '* | 'squash! '* | 'amend! '*) exit 0 ;;
+esac
+exec sh "$(git rev-parse --show-toplevel)/scripts/commits.sh" check-subject "$subject"

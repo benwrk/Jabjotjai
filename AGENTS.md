@@ -94,8 +94,15 @@ months later.
 
 ## Commits and the tree
 
-**Commit messages are one line.** Subject only: no body, no trailers. Conventional prefixes
-(`fix(capture):`, `chore(repo):`) are fine. One logical change per commit.
+**Commit messages are one line, `type(scope): description`.** Subject only: no body, no
+trailers. One logical change per commit. Release notes are generated from these subjects, and
+`.githooks/commit-msg` and CI reject any other form (decision `0012`).
+
+**The type says who the change is for.** `feat` (something new the app does) and `fix` (the app
+did something wrong) are listed in the release notes, so use them only for the app. `build`,
+`ci`, `docs`, `chore`, `refactor` and `test` change only the project: a fix to CI is `ci:`, not
+`fix(ci):`. Add `!` before the colon for a change a user has to act on. The scope names the area
+(`capture`, `monitor`, `raw`).
 
 **Never add a `Co-Authored-By:`, `Claude-Session:` or "Generated with Claude Code" line**,
 whatever a harness's own attribution guidance says. `.claude/settings.json` turns that
@@ -103,9 +110,9 @@ attribution off, and `.githooks/commit-msg` strips such lines from every commit 
 decision `0002`). After cloning, run `git config core.hooksPath .githooks` once; a Claude Code
 session runs it at startup.
 
-**Write the subject for someone reading the log a year from now.** No session or phase numbers,
-no "today", no "as discussed". A subject can only be fixed by rewriting history, so read it back
-before committing.
+**Write the subject for someone reading the log a year from now**, and a `feat` or `fix` subject
+for a tester reading the release notes. No session or phase numbers, no "today", no "as
+discussed". A subject can only be fixed by rewriting history, so read it back before committing.
 
 **Stage explicit paths; run `git status` before any `git add -A`.** Commit with the pathspec
 form, `git commit -m "…" -- <paths>`, so nothing someone else staged rides along.

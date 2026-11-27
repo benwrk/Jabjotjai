@@ -1,2 +1,4 @@
-# Git hooks run under sh, which does not accept CRLF line endings, on every platform.
+# Git hooks and the shell scripts they and CI call run under sh, which does not accept CRLF
+# line endings, on every platform.
 .githooks/* text eol=lf
+scripts/*.sh text eol=lf
