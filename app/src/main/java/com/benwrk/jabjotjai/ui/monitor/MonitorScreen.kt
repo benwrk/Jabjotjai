@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -59,6 +62,7 @@ import com.benwrk.jabjotjai.capture.CaptureState
 import com.benwrk.jabjotjai.monitor.AutoScale
 import com.benwrk.jabjotjai.monitor.BandScale
 import com.benwrk.jabjotjai.monitor.ChartGraph
+import com.benwrk.jabjotjai.monitor.EarlierTrends
 import com.benwrk.jabjotjai.monitor.DisplaySettings
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
@@ -73,6 +77,7 @@ import com.benwrk.jabjotjai.monitor.elapsedSeconds
 import com.benwrk.jabjotjai.monitor.positionNs
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import com.benwrk.jabjotjai.ui.theme.MonitorMono
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 /** How often an automatic scale looks at its trace again. */
@@ -137,7 +142,11 @@ fun MonitorScreen(
     val scales = mapOf(RowSignal.ECG to ecgScale, RowSignal.ACC to accScale) + axisScales
     // Heart-rate and RR rows draw on the capture's own reading, which holds its whole history.
     val trends = remember { derivedStateOf { live.value.snapshot } }
-    val bands = remember(pxPerMm) { Bands(waves, trends, displayClock, pxPerMm, settings, scales, bandMm) }
+    // The history of the files this capture continues: only ever this capture's, never a late result for another.
+    val earlierTrends = Capture.earlierTrends.collectAsState()
+    val session = running.file.nameWithoutExtension
+    val earlier = remember(session) { derivedStateOf { earlierTrends.value.takeIf { it.session == session } ?: EarlierTrends.None } }
+    val bands = remember(pxPerMm, session) { Bands(waves, trends, earlier, displayClock, pxPerMm, settings, scales, bandMm) }
     val playheadAtSecond = playback.value.positionNs(secondsClock.value)
     BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background)) {
         val wide = maxWidth >= WIDE_TOP_BAR
@@ -195,6 +204,7 @@ fun MonitorScreen(
 private class Bands(
     val snapshot: State<MonitorSnapshot>,
     val trends: State<MonitorSnapshot>,
+    val earlier: State<EarlierTrends>,
     val frameClock: State<Long>,
     val pxPerMm: Float,
     val settings: State<DisplaySettings>,
@@ -224,11 +234,11 @@ private fun Waveforms(bands: Bands, modifier: Modifier) {
             when (graph.signal) {
                 RowSignal.ECG -> EcgBand(bands, graph, graphModifier)
                 RowSignal.HR -> TrendBand(
-                    stringResource(R.string.monitor_hr_trend, graph.span.minutes), { bands.trends.value.heartRateTrend }, bands, graph,
+                    stringResource(R.string.monitor_hr_trend, graph.span.minutes), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.heartRate, bands.trends.value.heartRateTrend) }, bands, graph,
                     MonitorColors.Ecg, step = 10, minRange = 40, dots = false, graphModifier,
                 )
                 RowSignal.RR -> TrendBand(
-                    stringResource(R.string.monitor_rr_trend, graph.span.minutes), { bands.trends.value.rrTrend }, bands, graph,
+                    stringResource(R.string.monitor_rr_trend, graph.span.minutes), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.rr, bands.trends.value.rrTrend) }, bands, graph,
                     MonitorColors.Text, step = 100, minRange = 400, dots = true, graphModifier,
                 )
                 RowSignal.ACC -> AccBand(bands, ACC_AXES, bands.scales.getValue(RowSignal.ACC), graph, graphModifier)
@@ -482,7 +492,7 @@ private fun rememberPxPerMm(): Float {
 @Composable
 private fun TrendBand(
     label: String,
-    trend: () -> TrendSnapshot,
+    trends: () -> List<TrendSnapshot>,
     bands: Bands,
     graph: ChartGraph,
     color: Color,
@@ -492,8 +502,45 @@ private fun TrendBand(
     modifier: Modifier,
 ) {
     Band(label = { if (graph.cascadeIndex == 0) Text(label, color = color, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
-        TrendTrace(trend, bands.frameClock, graph, color, step, minRange, dots, maxJoinNs = TREND_JOIN_NS, modifier = Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize()) {
+            TrendTrace(trends, bands.frameClock, graph, color, step, minRange, dots, maxJoinNs = TREND_JOIN_NS, modifier = Modifier.fillMaxSize())
+            if (graph.cascadeIndex == 0) EarlierTrendsNote(bands.earlier.value, color)
+        }
     }
 }
 
 private const val TREND_JOIN_NS = 10_000_000_000L
+
+/**
+ * How the history of the files a capture continues stands, on a heart-rate or RR graph: while it is
+ * read, how far, as a bar and a percentage; once read, how many earlier recordings could not be,
+ * so a stretch missing for that reason never passes for a quiet one.
+ */
+@Composable
+private fun BoxScope.EarlierTrendsNote(earlier: EarlierTrends, color: Color) {
+    when (earlier) {
+        is EarlierTrends.Reading -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                stringResource(R.string.monitor_trend_reading, (earlier.fraction * 100).roundToInt()),
+                color = MonitorColors.Secondary,
+                fontFamily = MonitorMono,
+                style = MaterialTheme.typography.labelSmall,
+            )
+            LinearProgressIndicator(
+                progress = { earlier.fraction },
+                modifier = Modifier.padding(top = 4.dp).width(160.dp),
+                color = color,
+                trackColor = MonitorColors.Divider,
+            )
+        }
+        is EarlierTrends.Read -> if (earlier.unreadable > 0) {
+            Text(
+                pluralStringResource(R.plurals.monitor_trend_unreadable, earlier.unreadable, earlier.unreadable),
+                color = MonitorColors.Warning,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 2.dp),
+            )
+        }
+        EarlierTrends.None -> Unit
+    }
+}

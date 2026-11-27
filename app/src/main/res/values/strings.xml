@@ -49,6 +49,11 @@
     <string name="monitor_speed">· %1$s mm/s</string>
     <string name="monitor_hr_trend">HR · bpm · %1$d min</string>
     <string name="monitor_rr_trend">RR · ms · %1$d min</string>
+    <string name="monitor_trend_reading">Reading earlier recordings · %1$d%%</string>
+    <plurals name="monitor_trend_unreadable">
+        <item quantity="one">%d earlier recording could not be read</item>
+        <item quantity="other">%d earlier recordings could not be read</item>
+    </plurals>
     <string name="monitor_auto">· auto</string>
     <string name="monitor_read_error">Cannot read the raw file: %1$s</string>
     <string name="monitor_beep_unavailable">No beep: %1$s</string>

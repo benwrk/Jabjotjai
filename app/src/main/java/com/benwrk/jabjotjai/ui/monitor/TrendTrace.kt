@@ -24,7 +24,8 @@ import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import com.benwrk.jabjotjai.ui.theme.MonitorMono
 
 /**
- * A heart-rate or RR graph: [trend] up to [nowMonoNs], the playhead, across the graph's span. It
+ * A heart-rate or RR graph: [trends], each a series oldest first, such as the history of the files a
+ * capture continues and its own, up to [nowMonoNs], the playhead, across the graph's span. It
  * sweeps like the waveforms, folded across a cascade the same way, or scrolls with the newest value
  * at the right edge. A cascade is read as one strip: its scale covers what the whole strip shows,
  * rounded out to [step], so every graph of it reads alike; the scale's ends are written at the right.
@@ -33,7 +34,7 @@ import com.benwrk.jabjotjai.ui.theme.MonitorMono
  */
 @Composable
 fun TrendTrace(
-    trend: () -> TrendSnapshot,
+    trends: () -> List<TrendSnapshot>,
     nowMonoNs: State<Long>,
     graph: ChartGraph,
     color: Color,
@@ -45,47 +46,49 @@ fun TrendTrace(
 ) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier) {
-        val points = trend()
-        if (points.size == 0 || size.width <= 0f) return@Canvas
+        val series = trends()
+        if (series.all { it.size == 0 } || size.width <= 0f) return@Canvas
         val now = nowMonoNs.value
         val rowNs = graph.span.ns
         val stripNs = rowNs * graph.cascadeSize
         val sweeping = graph.motion == TrendMotion.SWEEP
         // The oldest time the strip shows: a sweep leaves a gap before its cursor, as the waveforms do.
         val earliest = now - stripNs + if (sweeping) rowNs / ERASE_FRACTION else 0L
-        val range = trendRange(points, earliest, now, step, minRange) ?: return@Canvas
+        val range = trendRange(series, earliest, now, step, minRange) ?: return@Canvas
         val (low, high) = range
 
         val path = Path()
         val dotRadius = 1.5.dp.toPx()
-        var drawing = false
-        var lastX = 0f
-        var lastT = Long.MIN_VALUE
-        for (i in 0 until points.size) {
-            val t = points.tNs[i]
-            val value = points.values[i]
-            if (t <= earliest || t > now || value == TrendSnapshot.BREAK) {
-                drawing = false
-                continue
+        for (points in series) {
+            var drawing = false
+            var lastX = 0f
+            var lastT = Long.MIN_VALUE
+            for (i in 0 until points.size) {
+                val t = points.tNs[i]
+                val value = points.values[i]
+                if (t <= earliest || t > now || value == TrendSnapshot.BREAK) {
+                    drawing = false
+                    continue
+                }
+                // How far along the strip, in graphs: its whole part is the graph, the rest how far across it.
+                val along = if (sweeping) Sweep.cascadeAcross(t, rowNs, graph.cascadeSize) else (t - (now - stripNs)).toFloat() / rowNs
+                val row = along.toInt().coerceIn(0, graph.cascadeSize - 1)
+                if (row != graph.cascadeIndex) {
+                    drawing = false
+                    continue
+                }
+                val x = (along - row) * size.width
+                val y = size.height * (1f - (value - low).toFloat() / (high - low))
+                if (dots) {
+                    drawCircle(color, dotRadius, Offset(x, y))
+                } else {
+                    // A wrap to the left edge, or too long without a value, starts a new line.
+                    if (drawing && x >= lastX && t - lastT <= maxJoinNs) path.lineTo(x, y) else path.moveTo(x, y)
+                    drawing = true
+                }
+                lastX = x
+                lastT = t
             }
-            // How far along the strip, in graphs: its whole part is the graph, the rest how far across it.
-            val along = if (sweeping) Sweep.cascadeAcross(t, rowNs, graph.cascadeSize) else (t - (now - stripNs)).toFloat() / rowNs
-            val row = along.toInt().coerceIn(0, graph.cascadeSize - 1)
-            if (row != graph.cascadeIndex) {
-                drawing = false
-                continue
-            }
-            val x = (along - row) * size.width
-            val y = size.height * (1f - (value - low).toFloat() / (high - low))
-            if (dots) {
-                drawCircle(color, dotRadius, Offset(x, y))
-            } else {
-                // A wrap to the left edge, or too long without a value, starts a new line.
-                if (drawing && x >= lastX && t - lastT <= maxJoinNs) path.lineTo(x, y) else path.moveTo(x, y)
-                drawing = true
-            }
-            lastX = x
-            lastT = t
         }
         if (!dots) drawPath(path, color, style = Stroke(width = 1.5.dp.toPx(), join = StrokeJoin.Round, cap = StrokeCap.Round))
 

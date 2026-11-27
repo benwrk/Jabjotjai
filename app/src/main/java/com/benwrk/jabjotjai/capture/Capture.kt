@@ -3,6 +3,8 @@ package com.benwrk.jabjotjai.capture
 import android.content.Context
 import com.benwrk.jabjotjai.monitor.CaptureTimeline
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
+import com.benwrk.jabjotjai.monitor.EarlierTrends
+import com.benwrk.jabjotjai.monitor.readEarlierTrends
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,6 +68,15 @@ object Capture {
 
     internal fun publish(state: CaptureState) {
         mutableState.value = state
+    }
+
+    private val mutableEarlierTrends = MutableStateFlow<EarlierTrends>(EarlierTrends.None)
+
+    /** The heart-rate and RR history of the files the running capture continues (see [readEarlierTrends]). */
+    val earlierTrends: StateFlow<EarlierTrends> = mutableEarlierTrends.asStateFlow()
+
+    internal fun publishEarlierTrends(trends: EarlierTrends) {
+        mutableEarlierTrends.value = trends
     }
 
     internal fun publishLive(reading: LiveReading) {

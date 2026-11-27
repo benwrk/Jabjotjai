@@ -176,6 +176,10 @@ The current scope.
    files, its monotonic clock started again, so an earlier file's times are moved by the difference
    between the wall-clock and monotonic times both headers record; otherwise they are used as they
    are.
+3. **The earlier files are read in the background**, while the capture's own reading, the monitor
+   and the notification carry on. Each heart-rate and RR row shows how far that reading has got, as
+   a bar and a percentage, and afterwards how many earlier recordings could not be read, if any; one
+   that cannot be read is skipped and the rest still read, and a line that cannot be is passed over.
 
 ## Later
 

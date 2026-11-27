@@ -62,19 +62,21 @@ fun rrEndTimes(receivedMonoNs: Long, rrMs: List<Int>): LongArray {
 }
 
 /**
- * The scale for the values of [trend] after [fromNs] and up to [toNs]: their lowest and highest,
+ * The scale for the values of [trends] after [fromNs] and up to [toNs]: their lowest and highest,
  * rounded out to multiples of [step], and at least [minRange] apart, widened evenly about their
  * middle, so a steady value still has room above and below. Null if there are none.
  */
-fun trendRange(trend: TrendSnapshot, fromNs: Long, toNs: Long, step: Int, minRange: Int): Pair<Int, Int>? {
+fun trendRange(trends: List<TrendSnapshot>, fromNs: Long, toNs: Long, step: Int, minRange: Int): Pair<Int, Int>? {
     var low = Int.MAX_VALUE
     var high = Int.MIN_VALUE
-    for (i in 0 until trend.size) {
-        val t = trend.tNs[i]
-        val value = trend.values[i]
-        if (t <= fromNs || t > toNs || value == TrendSnapshot.BREAK) continue
-        if (value < low) low = value
-        if (value > high) high = value
+    for (trend in trends) {
+        for (i in 0 until trend.size) {
+            val t = trend.tNs[i]
+            val value = trend.values[i]
+            if (t <= fromNs || t > toNs || value == TrendSnapshot.BREAK) continue
+            if (value < low) low = value
+            if (value > high) high = value
+        }
     }
     if (low > high) return null
     var bottom = Math.floorDiv(low, step) * step

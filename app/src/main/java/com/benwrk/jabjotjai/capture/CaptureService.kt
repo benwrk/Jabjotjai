@@ -20,7 +20,9 @@ import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.CaptureStateAt
 import com.benwrk.jabjotjai.monitor.CaptureTimeline
 import com.benwrk.jabjotjai.monitor.DisplaySettingsStore
+import com.benwrk.jabjotjai.monitor.EarlierTrends
 import com.benwrk.jabjotjai.monitor.MonitorModel
+import com.benwrk.jabjotjai.monitor.TrendSnapshot
 import com.benwrk.jabjotjai.monitor.beepAtBeats
 import com.benwrk.jabjotjai.monitor.beepGain
 import com.benwrk.jabjotjai.monitor.readEarlierTrends
@@ -44,6 +46,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -261,23 +265,51 @@ class CaptureService : Service() {
      * raw file"). Reading the file, not the capture, means a capture that stops writing shows as
      * one. Frames are not published one by one, since nothing that reads [Capture.live] draws them.
      */
-    private suspend fun readLive(file: File) {
-        val model = MonitorModel(keepNs = 0)
-        // The heart-rate and RR history of the files this capture continues, before its own (0.6).
+    /**
+     * Reads the heart-rate and RR history of the files [file]'s capture continues, in the
+     * background, publishing its progress and then the history (see [EarlierTrends]); the
+     * capture's own reading, the monitor and the notification never wait for it. It stops when the
+     * capture's reading stops, and all it publishes is tagged with the capture's session, so a late
+     * result cannot stand for another capture. A failure is logged and published as an earlier
+     * recording that could not be read, never thrown into the capture's own reading.
+     */
+    private suspend fun readEarlierTrendsOf(file: File) {
+        val header = runCatching { RawTail.readHeader(file) }.getOrNull() ?: return
+        val dir = file.parentFile ?: return
+        val session = header.session
+        val context = currentCoroutineContext()
+        val startedNs = SystemClock.elapsedRealtimeNanos()
+        val earlier = MonitorModel(keepNs = 0)
         try {
-            val startedNs = SystemClock.elapsedRealtimeNanos()
-            val read = withContext(Dispatchers.IO) {
-                RawTail.readHeader(file)?.let { header -> file.parentFile?.let { readEarlierTrends(model, it, header) } }
+            val read = readEarlierTrends(
+                earlier,
+                dir,
+                header,
+                onProgress = { fraction -> if (context.isActive) Capture.publishEarlierTrends(EarlierTrends.Reading(session, fraction)) },
+                keepGoing = { context.isActive },
+            )
+            if (!read.finished || !context.isActive) return
+            if (read.files == 0) {
+                Capture.publishEarlierTrends(EarlierTrends.None)
+                return
             }
-            if (read != null && read.files > 0) {
-                val ms = (SystemClock.elapsedRealtimeNanos() - startedNs) / 1_000_000
-                Log.i(TAG, "read the trends of ${read.files} earlier files, ${read.bytes / 1_000_000} MB, in $ms ms")
-            }
+            val ms = (SystemClock.elapsedRealtimeNanos() - startedNs) / 1_000_000
+            Log.i(TAG, "read the trends of ${read.files} earlier files, ${read.bytes / 1_000_000} MB, in $ms ms; ${read.unreadable} could not be read")
+            val snapshot = earlier.snapshot()
+            Capture.publishEarlierTrends(EarlierTrends.Read(session, snapshot.heartRateTrend, snapshot.rrTrend, read.unreadable))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "cannot read the trends of the files this capture continues", e)
+            if (context.isActive) Capture.publishEarlierTrends(EarlierTrends.Read(session, TrendSnapshot.EMPTY, TrendSnapshot.EMPTY, unreadable = 1))
         }
+    }
+
+    private suspend fun readLive(file: File) = coroutineScope {
+        // The heart-rate and RR history of the files this capture continues, read alongside (0.6).
+        Capture.publishEarlierTrends(EarlierTrends.None)
+        launch(Dispatchers.IO) { readEarlierTrendsOf(file) }
+        val model = MonitorModel(keepNs = 0)
         // Mapped as it is read, so the monitor can jump back to any moment (see CaptureTimeline).
         val timeline = CaptureTimeline()
         Capture.publishLive(LiveReading.EMPTY.copy(timeline = timeline))

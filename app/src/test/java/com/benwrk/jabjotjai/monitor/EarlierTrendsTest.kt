@@ -11,6 +11,7 @@ import com.benwrk.jabjotjai.raw.RawRecord
 import com.benwrk.jabjotjai.raw.Sensor
 import com.benwrk.jabjotjai.raw.Stamp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -80,5 +81,41 @@ class EarlierTrendsTest {
     fun aMissingEarlierFileEndsTheChain() {
         val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "gone")
         assertEquals(emptyList<Pair<File, HeaderRecord>>(), earlierCaptures(folder.root, b))
+    }
+
+    @Test
+    fun progressOnlyRisesAndEndsAtOne() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        write(a, *Array(2_000) { hr(101 * s + it * 1_000_000L, 60) })
+        val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "a")
+        val progress = mutableListOf<Float>()
+        val read = readEarlierTrends(MonitorModel(), folder.root, b, onProgress = { progress += it })
+        assertEquals(EarlierTrendsRead(files = 1, bytes = File(folder.root, "a.jsonl").length(), unreadable = 0, finished = true), read)
+        assertTrue("several steps reported: $progress", progress.size > 2)
+        assertEquals(progress.sorted(), progress)
+        assertEquals(1f, progress.last())
+    }
+
+    @Test
+    fun aLineThatCannotBeReadIsPassedOverAndTheRestKept() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        val file = write(a, hr(101 * s, 61))
+        // A heart-rate line cut off part-way, then a whole one after it.
+        file.appendText("{\"type\":\"hr\",\"cut off\n" + RawCodec.encode(hr(103 * s, 63)) + "\n")
+        val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "a")
+        val model = MonitorModel()
+        val read = readEarlierTrends(model, folder.root, b)
+        assertEquals(0, read.unreadable)
+        val trend = model.snapshot().heartRateTrend
+        assertEquals(listOf(61, 63, TrendSnapshot.BREAK), trend.values.take(trend.size))
+    }
+
+    @Test
+    fun readingStopsUnfinishedWhenTold() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        write(a, hr(101 * s, 61))
+        val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "a")
+        val read = readEarlierTrends(MonitorModel(), folder.root, b, keepGoing = { false })
+        assertEquals(false, read.finished)
     }
 }
