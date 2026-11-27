@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -30,7 +31,16 @@ class RawTail(
          * next complete line.
          */
         data class NearEnd(val bytes: Long) : Start
+
+        /**
+         * At [offset], a line's start as [linesWithOffsets] reported it. An offset that is not a
+         * line's start is moved forward to the start of the next complete line.
+         */
+        data class At(val offset: Long) : Start
     }
+
+    /** A line, and the byte offset in the file where it starts. */
+    data class OffsetLine(val offset: Long, val line: RawLine)
 
     /**
      * Waits for the file's header, chooses a decoder from the schema it declares, then emits each
@@ -42,14 +52,19 @@ class RawTail(
      *   major is one this build cannot read
      * @throws IOException if the file gets shorter, which an append-only file never does
      */
-    fun lines(from: Start = Start.Beginning): Flow<RawLine> = flow {
+    fun lines(from: Start = Start.Beginning): Flow<RawLine> = linesWithOffsets(from).map { it.line }
+
+    /** As [lines], with each line's byte offset, so a reader can later start again at that line. */
+    fun linesWithOffsets(from: Start = Start.Beginning): Flow<OffsetLine> = flow {
         val decode = RawDecoders.forHeaderLine(awaitFirstLine(), file)
         RandomAccessFile(file, "r").use { raf ->
             var position = when (from) {
                 Start.Beginning -> 0L
                 is Start.NearEnd -> (raf.length() - from.bytes).coerceAtLeast(0L)
+                is Start.At -> from.offset.coerceIn(0L, raf.length())
             }
             var skippingPartialLine = position > 0L && raf.byteAt(position - 1) != NEWLINE
+            var lineStart = position
             val pending = ByteArrayOutputStream()
             val buffer = ByteArray(BUFFER_BYTES)
             while (true) {
@@ -67,17 +82,22 @@ class RawTail(
                     delay(pollIntervalMs)
                     continue
                 }
+                val readStart = position
                 position += read
                 for (i in 0 until read) {
                     val byte = buffer[i]
                     if (skippingPartialLine) {
-                        if (byte == NEWLINE) skippingPartialLine = false
+                        if (byte == NEWLINE) {
+                            skippingPartialLine = false
+                            lineStart = readStart + i + 1
+                        }
                     } else if (byte != NEWLINE) {
                         pending.write(byte.toInt())
                     } else {
                         val line = decode(String(pending.toByteArray(), Charsets.UTF_8))
                         pending.reset()
-                        emit(line)
+                        emit(OffsetLine(lineStart, line))
+                        lineStart = readStart + i + 1
                         if (line is RawLine.Record && line.record is EndRecord) return@flow
                     }
                 }

@@ -179,4 +179,44 @@ class RawTailTest {
         val file = newFile().apply { writeText(line(Samples.header.copy(schema = "2.0"))) }
         assertThrows(UnreadableRawFileException::class.java) { RawTail.readHeader(file) }
     }
+
+    @Test
+    fun eachLineComesWithTheByteOffsetWhereItStarts() = runBlocking {
+        // The settings event carries a non-ASCII value, so characters and bytes differ.
+        val records = listOf(Samples.header, Samples.ecg, Samples.settings.copy(value = "µV ±"), Samples.hr, Samples.end)
+        val texts = records.map(::line)
+        val file = newFile().apply { writeText(texts.joinToString("")) }
+        val expectedOffsets = texts.runningFold(0L) { offset, text -> offset + text.toByteArray(Charsets.UTF_8).size }.dropLast(1)
+
+        val read = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
+
+        assertEquals(expectedOffsets, read.map { it.offset })
+        assertEquals(records.map { RawLine.Record(it) }, read.map { it.line })
+    }
+
+    @Test
+    fun startingAtAReportedOffsetResumesAtThatLine() = runBlocking {
+        val records = listOf(Samples.header, Samples.ecg, Samples.settings.copy(value = "µV ±"), Samples.hr, Samples.acc, Samples.end)
+        val file = newFile().apply { writeText(records.joinToString("") { line(it) }) }
+        val all = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
+
+        for (startIndex in 1 until all.size) {
+            val resumed = withTimeout(timeoutMs) {
+                RawTail(file, pollIntervalMs = 5).linesWithOffsets(RawTail.Start.At(all[startIndex].offset)).toList()
+            }
+            assertEquals("from line $startIndex", all.drop(startIndex), resumed)
+        }
+    }
+
+    @Test
+    fun anOffsetInsideALineMovesOnToTheNextLine() = runBlocking {
+        val records = listOf(Samples.header, Samples.ecg, Samples.hr, Samples.end)
+        val file = newFile().apply { writeText(records.joinToString("") { line(it) }) }
+        val all = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
+
+        val resumed = withTimeout(timeoutMs) {
+            RawTail(file, pollIntervalMs = 5).linesWithOffsets(RawTail.Start.At(all[1].offset + 3)).toList()
+        }
+        assertEquals(all.drop(2), resumed)
+    }
 }
