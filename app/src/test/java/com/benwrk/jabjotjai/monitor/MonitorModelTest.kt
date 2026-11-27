@@ -82,7 +82,7 @@ class MonitorModelTest {
         model.accept(RawLine.Malformed("{", "bad"))
         val snapshot = model.snapshot()
         assertEquals(RawEvents.DISCONNECTED, snapshot.connection)
-        assertEquals(87, snapshot.batteryPct)
+        assertEquals(87, snapshot.batteryPercentage)
         assertEquals(1, snapshot.gaps)
         assertEquals(1, snapshot.unknownLines)
         assertEquals(1, snapshot.malformedLines)

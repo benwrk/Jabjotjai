@@ -74,7 +74,7 @@ fun MonitorTopBar(
         PhoneStatus()
     }
     val vitalsGrid: @Composable () -> Unit = {
-        VitalsGrid(heartRate?.contact, snapshot.batteryPct, snapshot.gaps, heartRate?.lastRrMs)
+        VitalsGrid(heartRate?.contact, snapshot.batteryPercentage, snapshot.gaps, heartRate?.lastRrMs)
     }
     val heart: @Composable () -> Unit = {
         HeartRateReadout(heartRate?.bpm)
@@ -135,11 +135,11 @@ private fun PhoneStatus() {
     }
     Column {
         IconValue(R.drawable.ic_clock, null, status.time, MonitorColors.Secondary)
-        IconValue(R.drawable.ic_battery, stringResource(R.string.monitor_phone_battery), percent(status.batteryPct), MonitorColors.Secondary)
+        IconValue(R.drawable.ic_battery, stringResource(R.string.monitor_phone_battery), percent(status.batteryPercentage), MonitorColors.Secondary)
     }
 }
 
-private data class PhoneStatusValues(val time: String, val batteryPct: Int?)
+private data class PhoneStatusValues(val time: String, val batteryPercentage: Int?)
 
 /**
  * The time in the user's 12- or 24-hour format, and the battery as a whole percentage, or null
@@ -186,7 +186,7 @@ private fun BatteryOptimisationWarning() {
  * the gap count and the last RR interval as icons with their values, gaps amber when there are any.
  */
 @Composable
-private fun VitalsGrid(contact: Boolean?, batteryPct: Int?, gaps: Int, lastRrMs: Int?) {
+private fun VitalsGrid(contact: Boolean?, batteryPercentage: Int?, gaps: Int, lastRrMs: Int?) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column {
             val contactDescription = when (contact) {
@@ -198,7 +198,7 @@ private fun VitalsGrid(contact: Boolean?, batteryPct: Int?, gaps: Int, lastRrMs:
             IconValue(R.drawable.ic_gap, stringResource(R.string.monitor_gaps_label), gaps.toString(), if (gaps > 0) MonitorColors.Warning else MonitorColors.Secondary)
         }
         Column {
-            IconValue(R.drawable.ic_battery, stringResource(R.string.monitor_strap_battery), percent(batteryPct), MonitorColors.Secondary)
+            IconValue(R.drawable.ic_battery, stringResource(R.string.monitor_strap_battery), percent(batteryPercentage), MonitorColors.Secondary)
             IconValue(R.drawable.ic_rr, stringResource(R.string.monitor_rr_label), lastRrMs?.toString() ?: stringResource(R.string.monitor_no_value), MonitorColors.Ecg)
         }
     }

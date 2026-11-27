@@ -36,7 +36,7 @@ data class MonitorSnapshot(
     val ecgTiming: FrameTiming?,
     val accTiming: FrameTiming?,
     val heartRate: HeartRate?,
-    val batteryPct: Int?,
+    val batteryPercentage: Int?,
     /** The last connection event seen: one of [RawEvents.CONNECTING], `CONNECTED`, `DISCONNECTED`. */
     val connection: String?,
     val gaps: Int,
@@ -56,7 +56,7 @@ data class MonitorSnapshot(
             ecgTiming = null,
             accTiming = null,
             heartRate = null,
-            batteryPct = null,
+            batteryPercentage = null,
             connection = null,
             gaps = 0,
             beats = emptyList(),
@@ -86,7 +86,7 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
     private var ecgTiming: FrameTiming? = null
     private var accTiming: FrameTiming? = null
     private var heartRate: HeartRate? = null
-    private var batteryPct: Int? = null
+    private var batteryPercentage: Int? = null
     private var connection: String? = null
     private var gaps = 0
     private var unknownLines = 0
@@ -104,7 +104,7 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
      */
     fun startFrom(state: CaptureStateAt) {
         connection = state.connection
-        batteryPct = state.batteryPct
+        batteryPercentage = state.batteryPercentage
         gaps = state.gaps
     }
 
@@ -140,7 +140,7 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
                         connection = record.event
                         beats.restart()
                     }
-                    RawEvents.BATTERY -> batteryPct = record.levelPct
+                    RawEvents.BATTERY -> batteryPercentage = record.levelPct
                 }
                 is GapRecord -> {
                     gaps++
@@ -160,7 +160,7 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
         ecgTiming = ecgTiming,
         accTiming = accTiming,
         heartRate = heartRate,
-        batteryPct = batteryPct,
+        batteryPercentage = batteryPercentage,
         connection = connection,
         gaps = gaps,
         beats = beats.recent().asList(),

@@ -273,7 +273,7 @@ class CaptureService : Service() {
                 timeline.addLine(offset, time)
                 if (record !is EcgRecord && record !is AccRecord) {
                     val snapshot = model.snapshot()
-                    timeline.addState(time, CaptureStateAt(snapshot.connection, snapshot.batteryPct, snapshot.gaps))
+                    timeline.addState(time, CaptureStateAt(snapshot.connection, snapshot.batteryPercentage, snapshot.gaps))
                     Capture.publishLive(LiveReading(snapshot, readError = null, timeline = timeline))
                 }
             }
@@ -361,7 +361,7 @@ class CaptureService : Service() {
                     },
                 ),
                 getString(R.string.monitor_gaps, content.gaps),
-                content.batteryPct?.let { getString(R.string.monitor_battery, it) },
+                content.batteryPercentage?.let { getString(R.string.monitor_battery, it) },
             ).joinToString(" · ")
         }
         val icon = content.bpm?.takeUnless { content.readFailed }?.let { HeartRateIcon.create(this, it) }

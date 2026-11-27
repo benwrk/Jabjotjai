@@ -35,9 +35,9 @@ class CaptureTimelineTest {
     @Test
     fun theStateAtATimeIsTheLastChangeAtOrBeforeIt() {
         val timeline = CaptureTimeline()
-        timeline.addState(5 * s, CaptureStateAt(RawEvents.CONNECTED, batteryPct = 100, gaps = 0))
-        timeline.addState(6 * s, CaptureStateAt(RawEvents.CONNECTED, batteryPct = 100, gaps = 0))
-        timeline.addState(9 * s, CaptureStateAt(RawEvents.DISCONNECTED, batteryPct = 100, gaps = 1))
+        timeline.addState(5 * s, CaptureStateAt(RawEvents.CONNECTED, batteryPercentage = 100, gaps = 0))
+        timeline.addState(6 * s, CaptureStateAt(RawEvents.CONNECTED, batteryPercentage = 100, gaps = 0))
+        timeline.addState(9 * s, CaptureStateAt(RawEvents.DISCONNECTED, batteryPercentage = 100, gaps = 1))
 
         assertEquals(CaptureStateAt.INITIAL, timeline.stateAt(5 * s - 1))
         assertEquals(CaptureStateAt(RawEvents.CONNECTED, 100, 0), timeline.stateAt(8 * s))

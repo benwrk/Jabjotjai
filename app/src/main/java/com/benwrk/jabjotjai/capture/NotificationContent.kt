@@ -18,12 +18,12 @@ data class NotificationContent(
     val elapsedSeconds: Long?,
     val connection: String?,
     val gaps: Int,
-    val batteryPct: Int?,
+    val batteryPercentage: Int?,
     val readFailed: Boolean,
 ) {
     companion object {
         /** Before anything has been read. */
-        val STARTING = NotificationContent(bpm = null, elapsedSeconds = null, connection = null, gaps = 0, batteryPct = null, readFailed = false)
+        val STARTING = NotificationContent(bpm = null, elapsedSeconds = null, connection = null, gaps = 0, batteryPercentage = null, readFailed = false)
 
         /**
          * While the screen is off, the heart rate and the elapsed time are left out. Both change
@@ -36,7 +36,7 @@ data class NotificationContent(
             elapsedSeconds = snapshot.elapsedSeconds(nowMonoNs)?.takeIf { screenOn },
             connection = snapshot.connection,
             gaps = snapshot.gaps,
-            batteryPct = snapshot.batteryPct,
+            batteryPercentage = snapshot.batteryPercentage,
             readFailed = readFailed,
         )
     }

@@ -21,9 +21,9 @@ fun RawRecord.timeMonoNs(): Long = when (this) {
 }
 
 /** The capture's connection, strap battery and gap count as they stood at some moment. */
-data class CaptureStateAt(val connection: String?, val batteryPct: Int?, val gaps: Int) {
+data class CaptureStateAt(val connection: String?, val batteryPercentage: Int?, val gaps: Int) {
     companion object {
-        val INITIAL = CaptureStateAt(connection = null, batteryPct = null, gaps = 0)
+        val INITIAL = CaptureStateAt(connection = null, batteryPercentage = null, gaps = 0)
     }
 }
 
