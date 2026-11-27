@@ -261,6 +261,16 @@ Found by reading `MonitorViewModel`, not yet tried on the phone:
 Done when each has a test or has been tried on the phone, and none leaves the monitor stuck or
 showing another moment.
 
+## Make scrubbing finer as the finger moves up from the timeline
+
+The timeline's whole width is the whole capture, so the longer the capture, the more time each
+pixel of a drag covers: on the test phone's timeline in landscape, about 2,200 px across, a
+three-hour capture is about 5 s a pixel. The owner's idea (2026-11-28): while dragging, moving the
+finger up away from the timeline makes each pixel of sideways movement cover less time, so a
+moment can be found to the second without zooming. Open: how far up gives which fineness, and how
+the drag shows the fineness in use. Done when that is chosen, dragging further from the timeline
+moves the playhead in finer steps, and it has been tried on the test phone.
+
 ## Keep the monitor's indicators current
 
 - `StopQuestion` is process-wide and cleared only when answered, so a question opened from the
