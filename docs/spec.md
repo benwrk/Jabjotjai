@@ -186,6 +186,14 @@ Built and seen working on the test phone, except moving an earlier file's times 
    file, and playing on carries across into the next; the time between files shows as a gap, never
    joined. Until the earlier files have been read, the timeline starts at the current file.
 
+## 0.7: the next version
+
+The current scope; more items come from the review of 0.6.
+
+1. **The chart can use the whole display**, the camera cut-out included: an option in the cog menu
+   lets the waveforms and graphs draw under the cut-out instead of stopping short of it. Whether
+   it is on by default is not yet decided.
+
 ## Later
 
 Not scheduled. Each becomes a version when it is specified:
