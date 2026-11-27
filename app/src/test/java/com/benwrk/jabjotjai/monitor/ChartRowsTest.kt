@@ -15,8 +15,18 @@ import org.junit.Test
 class ChartRowsTest {
 
     @Test
-    fun theDefaultIsOneEcgGraphAboveOneAccelerometerGraph() {
-        assertEquals(listOf(ChartGraph(ECG, 1), ChartGraph(ACC, 1)), chartGraphs(DEFAULT_CHART_ROWS))
+    fun theDefaultIsTwoCascadedEcgGraphsAboveHeartRateAndRr() {
+        // Until 0.7 the default was 0.3's layout, one ECG graph above one accelerometer graph
+        // (`docs/spec.md`, 0.7 item 2).
+        assertEquals(
+            listOf(
+                ChartGraph(ECG, 1, cascadeIndex = 0, cascadeSize = 2),
+                ChartGraph(ECG, 1, cascadeIndex = 1, cascadeSize = 2),
+                ChartGraph(RowSignal.HR, 1, span = TrendSpan.MIN_15, motion = TrendMotion.SWEEP),
+                ChartGraph(RowSignal.RR, 1, span = TrendSpan.MIN_15, motion = TrendMotion.SWEEP),
+            ),
+            chartGraphs(DEFAULT_CHART_ROWS),
+        )
     }
 
     @Test

@@ -106,8 +106,16 @@ fun chartGraphs(rows: List<ChartRow>): List<ChartGraph> {
  */
 fun longestCascade(graphs: List<ChartGraph>): Int = graphs.filter { !it.signal.trend }.maxOfOrNull { it.cascadeSize } ?: 1
 
-/** The layout 0.3 had: one ECG row above one accelerometer row. */
-val DEFAULT_CHART_ROWS = listOf(ChartRow(RowSignal.ECG), ChartRow(RowSignal.ACC))
+/**
+ * The rows a fresh install shows: two ECG rows cascaded into one sweep at 25 mm/s, then heart-rate
+ * and RR rows of 15 minutes each, sweeping. Settings kept by an earlier version stay as they were.
+ */
+val DEFAULT_CHART_ROWS = listOf(
+    ChartRow(RowSignal.ECG),
+    ChartRow(RowSignal.ECG, RowRelation.CASCADED),
+    ChartRow(RowSignal.HR, span = TrendSpan.MIN_15, motion = TrendMotion.SWEEP),
+    ChartRow(RowSignal.RR, span = TrendSpan.MIN_15, motion = TrendMotion.SWEEP),
+)
 
 /** The most rows the chart takes. */
 const val MAX_CHART_ROWS = 6
