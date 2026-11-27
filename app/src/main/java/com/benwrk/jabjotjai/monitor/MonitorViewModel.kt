@@ -20,7 +20,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -80,7 +82,14 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         }
         viewModelScope.launch {
             combine(runningFile, replayStart) { file, _ -> file }.collectLatest { file ->
-                if (file != null && mutablePlayback.value is Playback.Past) replay(file)
+                if (file == null) return@collectLatest
+                if (beforeScrub == null) {
+                    if (mutablePlayback.value is Playback.Past) replay(file)
+                } else {
+                    // Collecting a StateFlow skips the values set while a read was running, so
+                    // each read finishes and the newest moment under the finger is always read next.
+                    scrubTarget.filterNotNull().collect { readMoment(file, it) }
+                }
             }
         }
         viewModelScope.launch {
@@ -102,37 +111,35 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         Capture.setReplayBeats(null)
     }
 
-    /** Jumps to [targetNs] of the capture, or to live if that is within a second of now. */
-    fun seek(targetNs: Long) {
-        val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
-        mutablePlayback.value = mutablePlayback.value.seek(targetNs, start, nowNs())
-        replayStart.value++
-    }
-
     /** The playback before the current drag began, or null when not dragging. */
     private var beforeScrub: Playback? = null
-    private var lastScrubRestartNs = 0L
+
+    /** The moment under the finger while the timeline is dragged. */
+    private val scrubTarget = MutableStateFlow<Long?>(null)
 
     /**
-     * Shows [targetNs] while the timeline is being dragged: paused there, read with only a short
-     * lead ([SCRUB_LEAD_NS]) so each step is quick. Each step starts the past reader again, which
-     * cancels the read of the step before, so a fast drag never queues reads up.
+     * Shows [targetNs] while the timeline is being dragged, paused. The screen moves there once
+     * that moment has been read, so it always shows a whole sweep, one read behind the finger;
+     * see [readMoment].
      */
     fun scrub(targetNs: Long) {
         val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
-        val before = beforeScrub ?: mutablePlayback.value.also { beforeScrub = it }
         val now = nowNs()
-        mutablePlayback.value = Playback.Past(targetNs.coerceIn(start, now), now, before.speed, paused = true)
-        // At most one restart every SCRUB_RESTART_NS, so each read has time to finish and show.
-        if (now - lastScrubRestartNs < SCRUB_RESTART_NS) return
-        lastScrubRestartNs = now
-        replayStart.value++
+        if (beforeScrub == null) {
+            val before = mutablePlayback.value
+            beforeScrub = before
+            // Live stays on screen until the first moment has been read; the past holds still.
+            if (before is Playback.Past) mutablePlayback.value = Playback.Past(before.positionNs(now), now, before.speed, paused = true)
+            replayStart.value++
+        }
+        scrubTarget.value = targetNs.coerceIn(start, now)
     }
 
     /** Ends a drag at [targetNs]: jumps there and plays or stays paused as before the drag began. */
     fun endScrub(targetNs: Long) {
         val before = beforeScrub ?: mutablePlayback.value
         beforeScrub = null
+        scrubTarget.value = null
         val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
         val now = nowNs()
         val base = if (before is Playback.Live) before else Playback.Past(targetNs, now, before.speed, before.paused)
@@ -178,19 +185,9 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
      * had arrived by then. Lines up to the playhead are taken at once, and published together.
      */
     private suspend fun replay(file: File) {
-        val live = Capture.live.value
-        val timeline = live.timeline ?: return
-        val header = live.snapshot.header ?: return
-        val lead = if (beforeScrub != null) SCRUB_LEAD_NS else REPLAY_LEAD_NS
-        val from = mutablePlayback.value.positionNs(nowNs()) - lead
-        val mark = timeline.markAtOrBefore(from)
-        val model = MonitorModel()
-        model.setHeader(header)
-        model.startFrom(if (mark == null) CaptureStateAt.INITIAL else timeline.stateAt(mark.monoNs - 1))
-        // While dragging, the last moment shown stays up until this read has something to show.
-        if (beforeScrub == null) mutableReplay.value = model.snapshot()
-        val start = if (mark == null) RawTail.Start.Beginning else RawTail.Start.At(mark.offset)
-        try {
+        val (model, start) = modelFrom(mutablePlayback.value.positionNs(nowNs()) - REPLAY_LEAD_NS) ?: return
+        mutableReplay.value = model.snapshot()
+        reportingReadErrors {
             RawTail(file).linesWithOffsets(start).collect { (_, line) ->
                 val time = (line as? RawLine.Record)?.record?.timeMonoNs()
                 if (time != null && time > mutablePlayback.value.positionNs(nowNs())) {
@@ -200,6 +197,45 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
                 model.accept(line)
             }
             mutableReplay.value = model.snapshot()
+        }
+    }
+
+    /**
+     * Reads the [SCRUB_LEAD_NS] up to [targetNs], then shows it: the screen and the paused
+     * playhead move there together, so what is drawn always matches the moment it is drawn at.
+     */
+    private suspend fun readMoment(file: File, targetNs: Long) {
+        val (model, start) = modelFrom(targetNs - SCRUB_LEAD_NS) ?: return
+        reportingReadErrors {
+            RawTail(file).linesWithOffsets(start)
+                .takeWhile { (_, line) -> ((line as? RawLine.Record)?.record?.timeMonoNs() ?: Long.MIN_VALUE) <= targetNs }
+                .collect { (_, line) -> model.accept(line) }
+            // A drag that ended while this read ran has already set where the playhead goes.
+            if (beforeScrub == null) return@reportingReadErrors
+            mutableReplay.value = model.snapshot()
+            val now = nowNs()
+            mutablePlayback.value = Playback.Past(targetNs, now, mutablePlayback.value.speed, paused = true)
+        }
+    }
+
+    /**
+     * A model for reading from [fromNs]: it starts at the last mark the capture's reader noted at
+     * or before then, with the state as it stood there, and the place in the file to read from.
+     */
+    private fun modelFrom(fromNs: Long): Pair<MonitorModel, RawTail.Start>? {
+        val live = Capture.live.value
+        val timeline = live.timeline ?: return null
+        val header = live.snapshot.header ?: return null
+        val mark = timeline.markAtOrBefore(fromNs)
+        val model = MonitorModel()
+        model.setHeader(header)
+        model.startFrom(if (mark == null) CaptureStateAt.INITIAL else timeline.stateAt(mark.monoNs - 1))
+        return model to (if (mark == null) RawTail.Start.Beginning else RawTail.Start.At(mark.offset))
+    }
+
+    private suspend fun reportingReadErrors(read: suspend () -> Unit) {
+        try {
+            read()
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
@@ -239,7 +275,6 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
         /** While dragging: about one sweep across a phone at the slower speeds, so each step reads little. */
         const val SCRUB_LEAD_NS = 10_000_000_000L
-        const val SCRUB_RESTART_NS = 120_000_000L
 
         const val MAX_WAIT_MS = 50L
         const val CATCH_UP_CHECK_MS = 200L
