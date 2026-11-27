@@ -121,6 +121,15 @@ The capture notification shows heart rate on the lock screen, the owner's chosen
 (`docs/spec.md`, 0.1 item 4). Done when a setting switches the notification to showing only that
 a capture is running and for how long, with the full content after unlocking.
 
+## Show the third-party licences inside the app
+
+The licences of the software the app includes go with each release as `THIRD_PARTY_NOTICES.md`,
+beside the APKs (decision `0015`), but the app itself does not show them. Polar's SDK licence asks
+for "adequate copyright markings" on the product, and Apache 2.0 for the licence to go to whoever
+receives the binaries. Done when the app has a screen, reachable from the display settings, that
+shows the same notices the release carries, generated from the same source so the two cannot
+differ.
+
 ## Confirm the `SessionStart` hook in a fresh Claude Code session
 
 It can only fire at session start, so it has not been observed working. Run
