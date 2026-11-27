@@ -132,6 +132,10 @@ reads (`levelPct` reads `level_pct`, which raw files already hold).
 **Leave touched code cleaner than you found it.** When the cleanup is large enough to be its own
 change, say so instead of silently widening scope.
 
+**Keep `README.md` describing the app as released.** When a release changes what users see,
+update its features, its "What's new" and any screenshot that no longer matches. It names no
+version numbers; the Releases page does.
+
 ## What committed artefacts may not contain
 
 These apply to code, comments, commit messages, decisions, rules and docs alike.

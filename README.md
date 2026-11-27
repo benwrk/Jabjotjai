@@ -6,7 +6,7 @@
 
 **A Holter-style recorder for a chest-strap ECG sensor.**
 
-Android 13+ · No account · No internet access · Version 0.4.0, prerelease
+Android 13+ · No account · No internet access · Early prerelease
 
 It records everything the strap sends, ECG, beat-to-beat (RR) intervals, heart rate and motion,
 continuously, through exercise, sleep and everything in between, and keeps it, as received, on your
@@ -15,10 +15,10 @@ phone. It works with the Polar H10, and has only been tested on a Samsung Galaxy
 
 ## Get the app
 
-Download `jabjotjai-0.4.0.apk` from the
-[0.4.0 release](https://github.com/benwrk/Jabjotjai/releases/tag/v0.4.0), an early prerelease, and
-open it on a phone running Android 13 or later. A newer version installs over an older one and
-keeps your recordings; never uninstall to update, because uninstalling deletes them.
+Download `jabjotjai-<version>.apk` from the
+[latest release](https://github.com/benwrk/Jabjotjai/releases/latest), the newest on the list
+while every release is still a prerelease, and open it on a phone running Android 13 or later. A newer version installs over an older one and keeps your recordings; never
+uninstall to update, because uninstalling deletes them.
 
 <table align="center">
   <tr>
@@ -40,10 +40,14 @@ keeps your recordings; never uninstall to update, because uninstalling deletes t
   traces, the heart rate beside a heart that flashes at every beat the strap reports, and the last
   RR interval.
 - **Read it the way a monitor is read**: sweep speed from 6.25 to 50 mm/s and ECG gain from ×0.25
-  to ×4 of 10 mm/mV, or automatic scaling, with a 1 mV calibration pulse that follows both.
-- **Lay out the chart as you need it**: up to six rows, each showing ECG, the accelerometer or a
-  single axis. Neighbouring rows of one signal join into one taller graph, or cascade into one
-  long sweep, the way a bedside monitor folds a long ECG strip across its screen.
+  to ×4 of 10 mm/mV, or automatic scaling, with a 1 mV calibration pulse that follows both. The
+  gain is one per signal, so every ECG row is drawn to the same scale and rows compare directly.
+- **Lay out the chart as you need it**: up to six rows, each showing ECG, the accelerometer, a
+  single axis, heart rate or RR intervals. A row can be a graph of its own, with its own speed,
+  or join the row above into one taller graph, or cascade on from it into one long sweep, the way
+  a bedside monitor folds a long ECG strip across its screen.
+- **Heart-rate and RR trends**: rows that plot the values the strap reported across 1 to 60
+  minutes, sweeping like the waveforms or scrolling with the newest value at the edge.
 - **An optional beep at each beat**, with its own volume, in the foreground or in the background
   too.
 - **Nothing is hidden by the display**: a peak that runs off the edge of its row is drawn on the
@@ -80,14 +84,14 @@ keeps your recordings; never uninstall to update, because uninstalling deletes t
 > condition, and must not be relied on for any medical decision. It is provided as is, without
 > warranty or guarantee of any kind. See [`LICENSE`](LICENSE).
 
-## What's new in 0.4.0
+## What's new
 
-- **Chart rows**: lay out the chart from the display settings, with up to six rows of ECG, the
-  accelerometer or a single axis. Neighbouring rows of one signal are joined into one taller graph
-  or cascaded into one long sweep, and the layout is kept between runs.
-- A cascade is drawn as one sweep folded across its rows, with one cursor and one label.
+- **Heart-rate and RR rows**, plotting the strap's values across 1 to 60 minutes.
+- **Rows with their own speeds**: a row can be a separate graph at its own sweep speed, so the
+  same ECG can be shown fast and slow at once.
 
-Every version's notes are on the [Releases](https://github.com/benwrk/Jabjotjai/releases) page.
+Each release's notes, generated from its changes, are on the
+[Releases](https://github.com/benwrk/Jabjotjai/releases) page.
 
 ## Data safety
 
@@ -102,7 +106,7 @@ Every version's notes are on the [Releases](https://github.com/benwrk/Jabjotjai/
 
 | | |
 | --- | --- |
-| Version | 0.4.0, an early prerelease |
+| Version | An early prerelease; see the [latest release](https://github.com/benwrk/Jabjotjai/releases/latest) |
 | Requires | Android 13 or later, and a Polar H10 chest strap |
 | Tested on | Samsung Galaxy S25, Android 17, One UI 9.0 |
 | Install | The APK from [Releases](https://github.com/benwrk/Jabjotjai/releases): `jabjotjai-<version>.apk` is the release build, `jabjotjai-<version>-debug.apk` the debug build of the same commit |
