@@ -144,8 +144,9 @@ These apply to code, comments, commit messages, decisions, rules and docs alike.
   Explain the actual reason in place.
 - **No editorialising in comments.** State what the code does and why, plainly.
 - **Nothing personal or machine-specific**: no personal names, no credentials, no absolute paths
-  from anyone's machine, no chat-transcript voice. The copyright line in `LICENSE` is the one
-  exception (decision `0014`).
+  from anyone's machine, no chat-transcript voice. The copyright line in `LICENSE` and the credit
+  "Made with ♥ in Bangkok by benwrk", worded in the app as decision `0018` sets, are the
+  exceptions (decisions `0014`, `0018`).
 - **No build or runtime switch added for local convenience.** An option that is harmless while
   unset is still a way for a shipped build to behave differently, and it fails as a missing file
   or a silent behaviour change rather than as a recognisable configuration mistake.

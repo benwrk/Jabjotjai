@@ -9,6 +9,8 @@ date: 2026-11-27
 
 # 0014 — The source is public but not licensed for reuse, and the software comes as is
 
+Amended by: `0018`
+
 ## Context
 
 The repository is public on GitHub, and testers install the APKs it releases (decision `0011`).

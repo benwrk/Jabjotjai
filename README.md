@@ -203,3 +203,7 @@ listed, with their licence texts, in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTI
 also attached to every release. The list is generated from the build's dependencies by
 [`scripts/third-party-notices.sh`](scripts/third-party-notices.sh), and CI fails if it falls out of
 date.
+
+---
+
+<p align="center">Made with ♥ in Bangkok by <a href="https://github.com/benwrk">benwrk</a></p>
