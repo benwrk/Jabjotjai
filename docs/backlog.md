@@ -24,35 +24,6 @@ if it carries "a valid proof-of-rotation" (developer.android.com/google/play/app
 updated to it without an uninstall (seen on the device, with the date), CI's secrets and expected
 certificate digest name the new key, and a decision records it.
 
-## Keep recovery away from a capture that is starting or failing
-
-`CaptureRecovery.find` takes the remembered capture for one the app did not end whenever its
-file has no `end` record. It runs from the picker, from `UpdateReceiver` and from the service's
-restart, and two paths reach it while a capture is still live (traced in the code on 2026-11-28,
-not seen on the phone):
-
-- `CaptureService.fail` publishes `Failed` before `endCapture` writes `end`. The picker appears
-  and runs `find` at once, on another thread, so it can write an ending note for a capture, and
-  offer to resume it, just before its `end` record lands. `docs/raw-format.md` says a file with
-  an `end` record has no note.
-- `start` saves the capture to `RunningCaptureStore` on the main thread, and `Running` is
-  published later, on the capture thread, once the file exists. A `find` in between clears the
-  record if the file does not exist yet, so a kill that night is neither noted nor resumed; if it
-  does exist, `find` writes a note with no exit beside the live file, which it then reuses for
-  good. The picker reaches that window only if it is recreated in it; `UpdateReceiver` reaches it
-  if Android both restarts the service and sends `MY_PACKAGE_REPLACED` after one update, which is
-  unverified.
-
-Two more endings can go wrong: `fail` can run once per failing stream, and a second
-`endCapture` clears the record although the first threw before writing `end`; and a second Stop
-while the first is ending lets `onDestroy` cancel `endCapture`, leaving no `end`, the record kept
-and the wake lock held (suspected; the window is short).
-
-Done when a flag set before the record is saved makes `find` and `UpdateReceiver` do nothing
-while a capture is live in the process, `Failed` is published only after `endCapture`, the
-record is cleared only by the call that wrote `end`, and tests show `find` doing nothing during a
-start and after a failure.
-
 ## Restart a stream that fails while the strap stays connected
 
 `PolarH10Link.startStream` runs again only when the SDK reports a feature ready, which it does

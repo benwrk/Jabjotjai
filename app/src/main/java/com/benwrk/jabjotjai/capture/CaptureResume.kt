@@ -80,18 +80,61 @@ data class UncleanEnd(val capture: RunningCapture, val note: EndingNote) {
 }
 
 /**
+ * Keeps a look for an unfinished capture away from a capture this process is running. Such a look
+ * takes the remembered capture for one the app did not end whenever its file has no `end` record,
+ * which is just as true while a capture is starting, running or being ended. From [hold], before
+ * the capture is remembered, until [release], once it has ended, [unlessHeld] does nothing. One
+ * lock covers all three, so a look already under way when [hold] is called finishes before it
+ * returns, and the capture is remembered only after.
+ */
+internal class RecoveryGuard {
+    private var held = false
+
+    @Synchronized
+    fun hold() {
+        held = true
+    }
+
+    /** Runs [then], such as forgetting the capture, before a look can see it again. */
+    @Synchronized
+    fun release(then: () -> Unit = {}) {
+        then()
+        held = false
+    }
+
+    @Synchronized
+    fun <T : Any> unlessHeld(look: () -> T?): T? = if (held) null else look()
+}
+
+/**
  * Looks, when the app runs again, for a remembered capture whose file has no `end` record, and
- * notes how it ended beside it (`docs/raw-format.md`, "The ending note"). Call it only when no
- * capture is running in this process.
+ * notes how it ended beside it (`docs/raw-format.md`, "The ending note"). While this process runs
+ * a capture, from [hold] to [release], [find] finds nothing.
  */
 object CaptureRecovery {
     private const val TAG = "CaptureRecovery"
     private const val TAIL_BYTES = 64 * 1024L
 
+    private val guard = RecoveryGuard()
+
     fun ending(file: File): File = File(file.parentFile, file.name.removeSuffix(".jsonl") + ".ending.json")
 
-    /** The capture that ended uncleanly, its note written if it was not already; null if there is none. */
-    fun find(context: Context): UncleanEnd? {
+    /** A capture is starting in this process: [find] finds nothing until [release]. */
+    fun hold() = guard.hold()
+
+    /**
+     * The capture this process ran has ended: forgotten if its `end` record was written ([ended]),
+     * otherwise left remembered, for [find] to note and offer as one the app did not end.
+     */
+    fun release(context: Context, ended: Boolean) = guard.release { if (ended) RunningCaptureStore.clear(context) }
+
+    /**
+     * The capture that ended uncleanly, its note written if it was not already; null if there is
+     * none, or while this process is running one.
+     */
+    fun find(context: Context): UncleanEnd? = guard.unlessHeld { look(context) }
+
+    private fun look(context: Context): UncleanEnd? {
         val capture = RunningCaptureStore.load(context) ?: return null
         if (!capture.file.isFile) {
             RunningCaptureStore.clear(context)

@@ -42,6 +42,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
@@ -58,6 +59,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Runs one capture in the foreground, independent of any screen: it connects to the strap,
@@ -89,9 +91,16 @@ class CaptureService : Service() {
     private var running = false
     private var wakeLock: PowerManager.WakeLock? = null
 
+    /**
+     * Whether this service holds [CaptureRecovery] off its capture: set on the main thread when a
+     * capture starts, and given up on the capture thread once it has ended.
+     */
+    private val holdingRecovery = AtomicBoolean(false)
+
     // Touched only on the capture thread.
     private var session: CaptureSession? = null
     private var link: PolarH10Link? = null
+    private var ending: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -128,6 +137,10 @@ class CaptureService : Service() {
     private fun start(sensorId: String, sensorName: String, sensorAddress: String, continues: String? = null) {
         if (running) return
         running = true
+        // Until this capture has ended, recovery must not take it, or the one it resumes, for a
+        // capture the app did not end.
+        holdingRecovery.set(true)
+        CaptureRecovery.hold()
         DisplaySettingsStore.init(this)
         val clock = SystemPhoneClock
         val start = clock.stamp()
@@ -143,6 +156,7 @@ class CaptureService : Service() {
             // it when next opened (decision 0013).
             Log.w(TAG, "could not start in the foreground", e)
             running = false
+            if (holdingRecovery.getAndSet(false)) CaptureRecovery.release(this, ended = false)
             stopSelf()
             return
         }
@@ -181,36 +195,64 @@ class CaptureService : Service() {
         running = false
         scope.launch {
             endCapture(reason)
-            Capture.publish(CaptureState.Idle)
             withContext(Dispatchers.Main) { finish() }
         }
     }
 
-    /** Runs on the capture thread. */
-    private suspend fun endCapture(reason: String) {
+    /**
+     * Runs on the capture thread. Ends the capture once: a stop, a failure or the service being
+     * destroyed while an ending is under way waits for that ending rather than starting another or
+     * cutting it short.
+     *
+     * @param failure why the capture failed, if it did, which is published as [CaptureState.Failed]
+     */
+    private suspend fun endCapture(reason: String, failure: String? = null) {
+        ending?.let {
+            it.join()
+            return
+        }
+        val done = Job().also { ending = it }
+        try {
+            endOnce(reason, failure)
+        } finally {
+            done.complete()
+        }
+    }
+
+    private suspend fun endOnce(reason: String, failure: String?) {
         val currentLink = link
         val currentSession = session
         link = null
         session = null
-        if (currentLink != null) {
-            currentLink.stop(reason)
-        } else if (currentSession != null && !currentSession.ended) {
-            currentSession.end(SystemPhoneClock.stamp(), reason)
+        var problem = failure
+        try {
+            if (currentLink != null) {
+                currentLink.stop(reason)
+            } else if (currentSession != null && !currentSession.ended) {
+                currentSession.end(SystemPhoneClock.stamp(), reason)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "could not end the capture", e)
+            problem = problem ?: e.message ?: e.toString()
+        } finally {
+            if (holdingRecovery.getAndSet(false)) {
+                // Forgotten only once its `end` is written; a capture whose ending failed stays
+                // remembered, for recovery to note and offer.
+                CaptureRecovery.release(this, ended = currentSession?.ended == true)
+                // Published only now, so the screen that replaces the monitor, which looks for a
+                // capture to recover, finds this one already ended.
+                Capture.publish(if (problem == null) CaptureState.Idle else CaptureState.Failed(problem))
+            }
         }
-        // Ended with its `end` record: nothing to note or resume.
-        RunningCaptureStore.clear(this)
     }
 
     /** Any failure on the capture thread ends the capture, loudly: it is published, never swallowed. */
     private fun fail(error: Throwable) {
         Log.e(TAG, "capture failed", error)
-        Capture.publish(CaptureState.Failed(error.message ?: error.toString()))
         scope.launch {
-            try {
-                endCapture(STOP_ON_ERROR)
-            } catch (e: Exception) {
-                Log.e(TAG, "could not end the session after a failure", e)
-            }
+            endCapture(STOP_ON_ERROR, failure = error.message ?: error.toString())
             withContext(Dispatchers.Main) {
                 running = false
                 finish()
@@ -219,25 +261,28 @@ class CaptureService : Service() {
     }
 
     private fun finish() {
+        letGo()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    /** Takes down what follows the capture once it has ended: the readers, the beep and the wake lock. */
+    private fun letGo() {
         liveScope.coroutineContext.cancelChildren()
         Capture.publishLive(LiveReading.EMPTY)
         Capture.publishBeepError(null)
         wakeLock?.takeIf { it.isHeld }?.release()
         wakeLock = null
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
     }
 
     override fun onDestroy() {
         liveScope.cancel()
-        if (running) {
-            // The system is destroying the service mid-capture: end the file properly before the
-            // capture thread goes away.
-            running = false
-            runBlocking(captureDispatcher) { endCapture(STOP_SERVICE_DESTROYED) }
-            Capture.publish(CaptureState.Idle)
-            wakeLock?.takeIf { it.isHeld }?.release()
-        }
+        running = false
+        // The system destroying the service mid-capture, or a second Stop while the first is still
+        // ending: end the file properly, or let that ending finish, before the capture thread goes
+        // away. With no capture, there is nothing to end and this returns at once.
+        runBlocking(captureDispatcher) { endCapture(STOP_SERVICE_DESTROYED) }
+        letGo()
         scope.cancel()
         captureExecutor.shutdown()
         super.onDestroy()

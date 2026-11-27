@@ -15,7 +15,8 @@ import android.util.Log
 class UpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
-        if (Capture.state.value is CaptureState.Running) return
+        // Finds nothing if the service has already resumed the capture, or is resuming it, in
+        // this process.
         val unclean = CaptureRecovery.find(context)
         Log.i(TAG, "updated; capture to resume: ${unclean?.capture?.session}, by itself: ${unclean?.resumesByItself}")
         if (unclean != null && unclean.resumesByItself) Capture.resume(context, unclean.capture)
