@@ -1,0 +1,24 @@
+#!/bin/sh
+# Keep commit messages free of attribution trailers.
+#
+# AGENTS.md requires a one-line subject with no trailers, but coding-agent harnesses
+# append a "Co-Authored-By:" line, a "Generated with Claude Code" line or a
+# "Claude-Session:" link by default. A written rule alone does not hold against that,
+# so this hook removes such lines from every commit message, whatever added them.
+#
+# It strips rather than rejects, so an appended line never blocks a commit. A message
+# with no such line is not rewritten at all. See decision 0002.
+#
+# Installed through git's core.hooksPath, which points at this directory.
+msg_file="$1"
+[ -n "$msg_file" ] && [ -f "$msg_file" ] || exit 0
+
+pattern='^[[:space:]]*(Co-Authored-By|Claude-Session):|Generated with \[?Claude Code'
+
+# Only POSIX grep options, so the hook behaves the same under Git for Windows, Linux and
+# macOS. grep exits 1 when it selects no lines, which is not an error here.
+grep -i -E -q -e "$pattern" "$msg_file" || exit 0
+cleaned="$msg_file.noattribution"
+grep -v -i -E -e "$pattern" "$msg_file" > "$cleaned"
+[ $? -le 1 ] || { rm -f "$cleaned"; exit 0; }
+mv "$cleaned" "$msg_file"

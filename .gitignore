@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Per-developer agent settings: permissions granted on one machine, absolute paths from
+# that machine's checkout. .claude/settings.json beside it is committed and is where
+# anything project-wide belongs.
+.claude/settings.local.json

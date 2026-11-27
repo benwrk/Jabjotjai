@@ -1,0 +1,2 @@
+# Git hooks run under sh, which does not accept CRLF line endings, on every platform.
+.githooks/* text eol=lf
