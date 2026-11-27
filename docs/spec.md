@@ -186,14 +186,15 @@ Built and seen working on the test phone, except moving an earlier file's times 
    file, and playing on carries across into the next; the time between files shows as a gap, never
    joined. Until the earlier files have been read, the timeline starts at the current file.
 
-## 0.7: the chart under the camera, a value under the finger, and a battery shortcut
+## 0.7: the chart under the camera, steadier heart-rate and RR rows, and a value under the finger
 
 Built and seen working on the test phone (Galaxy S25, camera hole in the middle of the top edge).
 The screens before a capture, which now keep clear of the system bars and the camera themselves,
 were seen on an emulator instead (Android 37, with a centre hole and a corner cut-out emulated,
-2026-11-28). Not seen anywhere: the monitor with a camera in a corner, which unit tests cover, and
-the fixes only a failure shows, such as the message when the last capture cannot be checked and a
-failed stream starting again on the strap (`docs/backlog.md`).
+2026-11-28), where the app-wide font was also checked. Not seen anywhere: the monitor with a
+camera in a corner, which unit tests cover, and the fixes only a failure shows, such as the
+message when the last capture cannot be checked and a failed stream starting again on the strap
+(`docs/backlog.md`).
 
 1. **The chart can use the whole display**, the camera cut-out included: an option in the cog menu
    lets the monitor reach the screen's edges under the cut-out instead of stopping short of it. A
@@ -210,11 +211,7 @@ failed stream starting again on the strap (`docs/backlog.md`).
    and the nearest value with the time it was received, in the phone's time format, following the
    finger as it moves and gone when it lifts; where no value is near, only the time shows.
 
-## 0.8: the next version
-
-The current scope.
-
-1. **Artifacts no longer flatten the heart-rate and RR rows.** Three settings in the cog menu, all
+5. **Artifacts no longer flatten the heart-rate and RR rows.** Three settings in the cog menu, all
    on by default, change only what is drawn; the raw file keeps every value:
    - the scale fits the middle 98% of the values, and a value beyond it is marked at its edge;
    - values the strap sent without skin contact are left out; switched off, they are drawn dimmed,
@@ -223,12 +220,12 @@ The current scope.
      does not set the scale either, and is marked at its top edge.
 
    Holding a finger on a marked value reads its real value.
-2. **The cog menu can restore every display setting to its default**, after asking, since one tap
+6. **The cog menu can restore every display setting to its default**, after asking, since one tap
    would otherwise lose a layout of rows built up over time. The recording is not affected.
-3. **The playback bar carries the app's version and its credit**, faintly, in one line between LIVE
+7. **The playback bar carries the app's version and its credit**, faintly, in one line between LIVE
    and the volume, only where it fits whole: "Jabjotjai 0.7.0 by benwrk · Made with ♥ in Bangkok"
    (decision `0018`).
-4. **The whole app is set in the monospaced font that ships with it**, the monitor's, so its start
+8. **The whole app is set in the monospaced font that ships with it**, the monitor's, so its start
    screens, sheets and dialogs look the same on every phone too.
 
 ## Later
