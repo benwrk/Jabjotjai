@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -150,8 +151,9 @@ fun TrendReadout(
     var held by remember { mutableStateOf<Offset?>(null) }
     val textMeasurer = rememberTextMeasurer()
     val context = LocalContext.current
-    val timeFormat = remember(context) {
-        val locale = context.resources.configuration.locales[0]
+    // From the composition's configuration, so a change of language reformats the time.
+    val locale = LocalConfiguration.current.locales[0]
+    val timeFormat = remember(context, locale) {
         SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, if (DateFormat.is24HourFormat(context)) "Hms" else "hms"), locale)
     }
     val withValue = stringResource(R.string.monitor_trend_readout)
