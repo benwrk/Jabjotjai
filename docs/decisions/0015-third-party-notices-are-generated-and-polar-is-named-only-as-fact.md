@@ -9,6 +9,8 @@ date: 2026-11-27
 
 # 0015 — Third-party notices are generated from the build, and Polar is named only as a fact
 
+Amended by: `0016`
+
 ## Context
 
 The released APKs include third-party software. The release runtime classpath held 112 libraries
