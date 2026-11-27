@@ -79,6 +79,22 @@ the folded custom view.
 Done when the folded and open views of a custom layout have been seen on the test phone beside
 the current notification, and the owner has chosen one.
 
+## Decide what to call the phone and the strap
+
+The code, comments and docs say "phone" for the device the app runs on and mix "strap" and
+"sensor" for the Polar H10. The owner dislikes "phone". Proposed on 2026-11-27, none chosen yet:
+
+- "system" for the phone's clocks and internals, as Android's own `SystemClock` and
+  `System.currentTimeMillis` say, and "phone" kept on screen, where people see a phone;
+- "device" for the phone and "sensor" for the strap, which reads naturally, but Polar's SDK
+  (`deviceId`) and the stored `device_info` events already say "device" for the strap.
+
+Whatever is chosen, raw files keep their field names (`phone`, `sensor`, `device_info`) and an
+existing schema's section of `docs/raw-format.md` keeps its wording (`docs/rules/raw-format.md`).
+
+Done when the owner has chosen, one line in `AGENTS.md` defines the terms, and code, comments and
+docs use them.
+
 ## Prove a capture survives 30 minutes on battery with the screen off
 
 `docs/spec.md` 0.1 item 4, staying connected in the background, is the one 0.1 requirement not
