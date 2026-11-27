@@ -42,7 +42,11 @@ Seen working on 2026-11-27: an update during a capture, with the app off screen,
 new file whose header names the old one and wrote the old one's ending note with reason
 `PACKAGE_UPDATED`, every time; the offer to resume appeared after a capture was left unfinished;
 and swiping the app away from recent apps left the capture running (the same process and file,
-129 lines and 15 heart rates in the next 15 s, no `end` record). Not yet as specified:
+129 lines and 15 heart rates in the next 15 s, no `end` record). Force stop during a capture
+restarted nothing, the ending note gave `USER_REQUESTED` ("[FORCE STOP]"), and opening the app
+offered to resume it as force-stopped; Resume continued it into a new file. After the kill below,
+opening the app offered to resume it as stopped by Android, and Resume continued it likewise. Not
+yet as specified:
 
 - **A kill that Android restarts did not restart.** The capture's process was killed with
   `adb shell run-as com.benwrk.jabjotjai kill -9 <pid>` (battery optimisation on). The event log
@@ -51,10 +55,8 @@ and swiping the app away from recent apps left the capture running (the same pro
   nothing had restarted it. Opening the app then wrote the ending note with reason `SIGNALED`.
   Mechanism unconfirmed: whether a kill from the app's own user, rather than the low-memory
   killer, is why no restart was scheduled, or One UI's battery management.
-- **The dead capture's notification stayed up**, with the heart rate it last showed, for as long
-  as the service record waited, so the phone looked as if it was still capturing.
-- **Force stop**: not tried; the phone was locked after the kill, and it needs a running capture
-  and the offer to answer.
+- **The dead capture's notification stayed up**: the lock screen showed its heart icon with a
+  heart rate three and a half minutes after the kill, while nothing was capturing.
 - **An update while the app is on screen does not resume by itself.** Seen twice on 2026-11-27:
   Android restarted the app for its on-screen activity before sending the update broadcast, and
   `adb shell dumpsys activity broadcasts history` lists `MY_PACKAGE_REPLACED` to `UpdateReceiver`
