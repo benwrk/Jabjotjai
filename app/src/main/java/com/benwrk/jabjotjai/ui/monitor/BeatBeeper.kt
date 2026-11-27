@@ -68,17 +68,27 @@ class BeatBeeper : AutoCloseable {
         const val TAG = "BeatBeeper"
         const val SLOW_BEEP_MS = 20L
         const val SAMPLE_RATE_HZ = 48_000
-        const val TONE_HZ = 880.0
-        const val TONE_MS = 60
-        const val FADE_MS = 5
 
-        /** The tone at half of full scale, faded in and out so it starts and stops without a click. */
+        // The owner's chosen recipe for a monitor beep (2026-11-27): a sine at 880 Hz, held at full
+        // level, with a short attack so it does not click and a slightly longer release so its
+        // tail stays clean. By ear on the test phone, the same pitch as a 60 ms tone with 5 ms
+        // fades sounded like a "bloop", and 1 kHz and 1.5 kHz with an added third harmonic too
+        // high.
+        const val TONE_HZ = 880.0
+        const val TONE_MS = 80
+        const val ATTACK_MS = 5
+        const val RELEASE_MS = 15
+
+        /** The tone's peak, as a share of full scale. */
+        const val PEAK = 0.5
+
         val TONE: ShortArray = run {
             val samples = SAMPLE_RATE_HZ * TONE_MS / 1_000
-            val fade = SAMPLE_RATE_HZ * FADE_MS / 1_000
+            val attack = SAMPLE_RATE_HZ * ATTACK_MS / 1_000
+            val release = SAMPLE_RATE_HZ * RELEASE_MS / 1_000
             ShortArray(samples) { i ->
-                val envelope = min(1.0, min(i, samples - 1 - i).toDouble() / fade)
-                (sin(2 * PI * TONE_HZ * i / SAMPLE_RATE_HZ) * envelope * 0.5 * Short.MAX_VALUE).toInt().toShort()
+                val envelope = min(1.0, min(i.toDouble() / attack, (samples - 1 - i).toDouble() / release))
+                (sin(2 * PI * TONE_HZ * i / SAMPLE_RATE_HZ) * envelope * PEAK * Short.MAX_VALUE).toInt().toShort()
             }
         }
     }
