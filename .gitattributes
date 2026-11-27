@@ -2,3 +2,7 @@
 # line endings, on every platform.
 .githooks/* text eol=lf
 scripts/*.sh text eol=lf
+# Reference recordings are kept byte for byte as the phone wrote them, apart from the identifiers
+# replaced in them (see their README), so git must not touch their line endings.
+app/src/test/resources/raw-reference/**/*.jsonl -text
+app/src/test/resources/raw-reference/**/*.json -text

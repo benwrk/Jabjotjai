@@ -1,0 +1,4 @@
+{"type":"header","schema":"1.0","session":"20261127T100423Z-3cf1","app":"0.1.0 (1000)","sdk":"9.0.0","phone":{"make":"samsung","model":"SM-S931B","android":"17","api":37},"start":{"wall_ms":1795773863631,"mono_ns":20640568117134},"sensor":{"id":"A1B2C3D4","name":"Polar H10 A1B2C3D4"},"sensor_epoch":"2000-01-01"}
+{"type":"event","wall_ms":1795773863640,"mono_ns":20640577592290,"event":"ble_power","value":"on"}
+{"type":"event","wall_ms":1795773863643,"mono_ns":20640579807447,"event":"connecting"}
+{"type":"end","wall_ms":1795774043467,"mono_ns":20820404551232,"reason":"user_stop","open_gaps":[]}
