@@ -107,7 +107,8 @@ cannot end itself properly; it is noted and resumed afterwards instead.
    from the capture's start, and a tap switches between the two. A speaker mutes or unmutes the
    beat beep, and a slider beside it sets the beep's own volume, under the media volume, which it
    still follows; dragging it to nothing mutes. A cog opens the display settings. The choices are
-. **The monitor fills the screen** (also in 0.3). The system status bar is hidden while it is
+   kept between runs.
+8. **The monitor fills the screen** (also in 0.3). The system status bar is hidden while it is
    shown, and the waveforms take the full width under one bar that holds, from the left: the strap
    and its connection; the phone's time and battery; an amber icon, only while battery
    optimisation is on, that explains itself when tapped; skin contact as an icon, lit or dark, and
