@@ -48,17 +48,17 @@ class NotificationContentTest {
     @Test
     fun withTheScreenOnItShowsTheHeartRateAndTheLastRrInterval() {
         val fresh = NotificationContent.of(snapshot(), nowMonoNs = startMonoNs + 2 * second, readFailed = false, screenOn = true)
-        assertEquals(NotificationContent(bpm = 72, rrMs = 830, connection = RawEvents.CONNECTED, gaps = 0, batteryPercentage = 90, readFailed = false), fresh)
+        assertEquals(NotificationContent(bpm = 72, rrMs = 830, contact = true, connection = RawEvents.CONNECTED, gaps = 0, batteryPercentage = 90, readFailed = false), fresh)
 
-        // 3725 s after the start the heart rate is stale, and its RR interval goes with it.
+        // 3725 s after the start the heart rate is stale, and its RR interval and contact go with it.
         val stale = NotificationContent.of(snapshot(), nowMonoNs = startMonoNs + 3_725 * second, readFailed = false, screenOn = true)
-        assertEquals(NotificationContent(bpm = null, rrMs = null, connection = RawEvents.CONNECTED, gaps = 0, batteryPercentage = 90, readFailed = false), stale)
+        assertEquals(NotificationContent(bpm = null, rrMs = null, contact = null, connection = RawEvents.CONNECTED, gaps = 0, batteryPercentage = 90, readFailed = false), stale)
     }
 
     @Test
     fun withTheScreenOffItLeavesOutWhatChangesAtEveryBeatAndKeepsTheRest() {
         val content = NotificationContent.of(snapshot(), nowMonoNs = startMonoNs + 2 * second, readFailed = false, screenOn = false)
-        assertEquals(NotificationContent(bpm = null, rrMs = null, connection = RawEvents.CONNECTED, gaps = 0, batteryPercentage = 90, readFailed = false), content)
+        assertEquals(NotificationContent(bpm = null, rrMs = null, contact = true, connection = RawEvents.CONNECTED, gaps = 0, batteryPercentage = 90, readFailed = false), content)
     }
 
     @Test
@@ -71,6 +71,6 @@ class NotificationContentTest {
     @Test
     fun beforeAnythingIsReadOnlyTheFailureIsKnown() {
         val content = NotificationContent.of(MonitorSnapshot.EMPTY, nowMonoNs = 5 * second, readFailed = true, screenOn = true)
-        assertEquals(NotificationContent(bpm = null, rrMs = null, connection = null, gaps = 0, batteryPercentage = null, readFailed = true), content)
+        assertEquals(NotificationContent(bpm = null, rrMs = null, contact = null, connection = null, gaps = 0, batteryPercentage = null, readFailed = true), content)
     }
 }

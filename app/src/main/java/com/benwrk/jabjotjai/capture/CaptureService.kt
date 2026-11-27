@@ -369,6 +369,16 @@ class CaptureService : Service() {
                 content.rrMs?.let { getString(R.string.capture_notification_rr, it) },
                 getString(R.string.monitor_gaps, content.gaps),
                 content.batteryPercentage?.let { getString(R.string.monitor_battery, it) },
+                getString(
+                    R.string.capture_notification_contact,
+                    getString(
+                        when (content.contact) {
+                            true -> R.string.monitor_contact_ok_short
+                            false -> R.string.monitor_contact_off_short
+                            null -> R.string.monitor_no_value
+                        },
+                    ),
+                ),
             ).joinToString(" · ")
         }
         val icon = content.bpm?.takeUnless { content.readFailed }?.let { HeartRateIcon.create(this, it) }

@@ -9,12 +9,15 @@ import com.benwrk.jabjotjai.monitor.currentHeartRate
  *
  * @param bpm the strap's heart rate, or null if there is none, it is stale, or the screen is off
  * @param rrMs the last RR interval the strap reported, in ms, under the same conditions as [bpm]
+ * @param contact whether the strap reports skin contact, or null while unknown or the heart rate is
+ *   stale; kept while the screen is off, since it changes rarely
  * @param connection the last connection event, one of the `RawEvents` connection values, or null
  * @param readFailed the reader could not read the file
  */
 data class NotificationContent(
     val bpm: Int?,
     val rrMs: Int?,
+    val contact: Boolean?,
     val connection: String?,
     val gaps: Int,
     val batteryPercentage: Int?,
@@ -22,7 +25,7 @@ data class NotificationContent(
 ) {
     companion object {
         /** Before anything has been read. */
-        val STARTING = NotificationContent(bpm = null, rrMs = null, connection = null, gaps = 0, batteryPercentage = null, readFailed = false)
+        val STARTING = NotificationContent(bpm = null, rrMs = null, contact = null, connection = null, gaps = 0, batteryPercentage = null, readFailed = false)
 
         /**
          * While the screen is off, the heart rate and the RR interval are left out. Both change
@@ -35,6 +38,7 @@ data class NotificationContent(
             return NotificationContent(
                 bpm = heartRate?.bpm,
                 rrMs = heartRate?.lastRrMs,
+                contact = snapshot.currentHeartRate(nowMonoNs)?.contact,
                 connection = snapshot.connection,
                 gaps = snapshot.gaps,
                 batteryPercentage = snapshot.batteryPercentage,
