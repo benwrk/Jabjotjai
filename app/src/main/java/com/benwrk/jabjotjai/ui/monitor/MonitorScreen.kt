@@ -66,6 +66,7 @@ import com.benwrk.jabjotjai.monitor.TraceSnapshot
 import com.benwrk.jabjotjai.monitor.elapsedSeconds
 import com.benwrk.jabjotjai.monitor.positionNs
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
+import com.benwrk.jabjotjai.ui.theme.MonitorMono
 import kotlinx.coroutines.delay
 
 /** How often an automatic scale looks at its trace again. */
@@ -124,11 +125,13 @@ fun MonitorScreen(
         val wide = maxWidth >= WIDE_TOP_BAR
         Column(Modifier.fillMaxSize()) {
             MonitorTopBar(
+                sensorId = running.sensorId,
                 sensorName = running.sensorName,
                 live = live.value.snapshot,
                 vitals = vitals,
                 frameClock = displayClock,
                 playheadNs = playheadAtSecond,
+                beepError = beepError,
                 wide = wide,
                 onStop = onStop,
             )
@@ -138,9 +141,6 @@ fun MonitorScreen(
                     color = MonitorColors.Alarm,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
-            }
-            beepError?.let {
-                Text(stringResource(R.string.monitor_beep_unavailable, it), color = MonitorColors.Warning, modifier = Modifier.padding(horizontal = 12.dp))
             }
             Waveforms(bands, Modifier.weight(1f).fillMaxWidth())
             PlaybackBar(
@@ -206,7 +206,7 @@ private fun EcgBand(bands: Bands, modifier: Modifier) {
         plainNumber(gain),
         plainNumber(bands.settings.value.sweep.mmPerSecond),
     ) + if (bands.settings.value.ecgAuto) " " + stringResource(R.string.monitor_auto) else ""
-    Band(label = { Text(label, color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall) }, modifier) {
+    Band(label = { Text(label, color = MonitorColors.Ecg, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
         SweepTrace(
             snapshot = bands.snapshot,
             nowMonoNs = bands.frameClock,
@@ -240,7 +240,7 @@ private fun AccBand(bands: Bands, modifier: Modifier) {
         }
         withStyle(SpanStyle(color = MonitorColors.Text)) { append(" $scaleText") }
     }
-    Band(label = { Text(label, style = MaterialTheme.typography.labelSmall) }, modifier) {
+    Band(label = { Text(label, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
         val offset = bandOffset(ScaleLadder.ACC, bands.accScale, bands.pxPerMm)
         for (axis in ACC_AXES) {
             SweepTrace(

@@ -5,19 +5,16 @@ import android.os.BatteryManager
 import android.os.PowerManager
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -31,7 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,30 +43,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.benwrk.jabjotjai.R
-import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.currentHeartRate
+import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
+import com.benwrk.jabjotjai.ui.theme.MonitorMono
+import com.benwrk.jabjotjai.ui.theme.inCells
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 
 /**
  * The one bar above the full-width waveforms, standing in for the system status bar the monitor
- * hides: the strap and its connection, the phone's time and battery, a warning while battery
- * optimisation is on, the strap's contact, battery, gaps and last RR interval, heart rate with the
- * beat heart, and Stop, which asks first. On a narrow screen it takes two rows.
+ * hides: the strap's id and connection, the phone's time and battery, warnings, the strap's
+ * contact, battery, gaps and last RR interval, heart rate with the beat heart, and Stop, which asks
+ * first. Every icon says what it is when tapped or held. On a narrow screen it takes two rows.
+ * Numbers are in a monospaced face, as on a bedside monitor, so they do not shift as they change.
  *
  * The connection is always the capture's as it is now; the vitals are at the playhead.
  *
  * @param playheadNs the playhead, on the capture's clock, for whether heart rate is still current
+ * @param beepError why the beat beep stopped, or null while it works or is off
  */
 @Composable
 fun MonitorTopBar(
+    sensorId: String,
     sensorName: String,
     live: MonitorSnapshot,
     vitals: State<MonitorSnapshot>,
     frameClock: State<Long>,
     playheadNs: Long,
+    beepError: String?,
     wide: Boolean,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
@@ -70,15 +82,23 @@ fun MonitorTopBar(
     val snapshot = vitals.value
     val heartRate = snapshot.currentHeartRate(playheadNs)
     val start: @Composable () -> Unit = {
-        Strap(sensorName, live.connection)
+        Strap(sensorId, sensorName, live.connection)
         PhoneStatus()
+    }
+    val warnings: @Composable () -> Unit = {
+        BatteryOptimisationWarning()
+        beepError?.let { BeepWarning(it) }
     }
     val vitalsGrid: @Composable () -> Unit = {
         VitalsGrid(heartRate?.contact, snapshot.batteryPercentage, snapshot.gaps, heartRate?.lastRrMs)
     }
     val heart: @Composable () -> Unit = {
-        HeartRateReadout(heartRate?.bpm)
-        BeatHeart({ vitals.value.beats }, frameClock, Modifier.size(24.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HeartRateReadout(heartRate?.bpm)
+            WithTip(stringResource(R.string.tip_heart), Modifier.padding(start = 4.dp)) {
+                BeatHeart({ vitals.value.beats }, frameClock, Modifier.size(24.dp))
+            }
+        }
     }
     val rowModifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
     val spacing = Arrangement.spacedBy(16.dp)
@@ -86,7 +106,7 @@ fun MonitorTopBar(
         Row(modifier.then(rowModifier), horizontalArrangement = spacing, verticalAlignment = Alignment.CenterVertically) {
             start()
             Spacer(Modifier.weight(1f))
-            BatteryOptimisationWarning()
+            warnings()
             vitalsGrid()
             heart()
             StopButton(onStop)
@@ -96,7 +116,7 @@ fun MonitorTopBar(
             Row(rowModifier, horizontalArrangement = spacing, verticalAlignment = Alignment.CenterVertically) {
                 start()
                 Spacer(Modifier.weight(1f))
-                BatteryOptimisationWarning()
+                warnings()
                 StopButton(onStop)
             }
             Row(rowModifier, horizontalArrangement = spacing, verticalAlignment = Alignment.CenterVertically) {
@@ -108,52 +128,100 @@ fun MonitorTopBar(
     }
 }
 
+/** The strap's id, without the model name every strap shares, which its tip gives; and its connection as an icon. */
 @Composable
-private fun Strap(sensorName: String, connection: String?) {
-    val (text, color) = when (connection) {
-        RawEvents.CONNECTED -> stringResource(R.string.monitor_connected) to MonitorColors.Ecg
-        RawEvents.CONNECTING -> stringResource(R.string.monitor_connecting) to MonitorColors.Warning
-        RawEvents.DISCONNECTED -> stringResource(R.string.monitor_disconnected) to MonitorColors.Alarm
-        else -> stringResource(R.string.monitor_waiting) to MonitorColors.Warning
+private fun Strap(sensorId: String, sensorName: String, connection: String?) {
+    val (icon, color, state) = when (connection) {
+        RawEvents.CONNECTED -> Triple(R.drawable.ic_link_connected, MonitorColors.Ecg, R.string.monitor_connected)
+        RawEvents.CONNECTING -> Triple(R.drawable.ic_link_searching, MonitorColors.Warning, R.string.monitor_connecting)
+        RawEvents.DISCONNECTED -> Triple(R.drawable.ic_link_lost, MonitorColors.Alarm, R.string.monitor_disconnected)
+        else -> Triple(R.drawable.ic_link_searching, MonitorColors.Warning, R.string.monitor_waiting)
     }
-    Column {
-        Text(sensorName, color = MonitorColors.Text, style = MaterialTheme.typography.bodyMedium)
-        Text(text, color = color, style = MaterialTheme.typography.bodyMedium)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        WithTip(sensorName) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(R.drawable.ic_sensor), contentDescription = null, tint = MonitorColors.Text, modifier = Modifier.size(18.dp))
+                Text(sensorId, color = MonitorColors.Text, fontFamily = MonitorMono, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 4.dp))
+            }
+        }
+        WithTip(stringResource(state), Modifier.padding(start = 6.dp), tint = color) {
+            Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+        }
     }
 }
 
-/** The phone's time and battery, which the hidden system status bar would otherwise show. */
+/** The phone's date, time and battery, which the hidden system status bar would otherwise show. */
 @Composable
 private fun PhoneStatus() {
     val context = LocalContext.current
-    val status by produceState(readPhoneStatus(context), context) {
+    val clock = remember(context) { clockFormat(context) }
+    val clockCells = remember(clock) { widestTime(clock) }
+    val status by produceState(readPhoneStatus(context, clock), context, clock) {
         while (true) {
-            value = readPhoneStatus(context)
-            // Just after the next second starts, so the minute changes when the phone's clock does.
+            value = readPhoneStatus(context, clock)
+            // Just after the next second starts, so the seconds change when the phone's clock does.
             delay(1_000L - System.currentTimeMillis() % 1_000L)
         }
     }
     Column {
-        IconValue(R.drawable.ic_clock, null, status.time, MonitorColors.Secondary)
-        IconValue(R.drawable.ic_battery, stringResource(R.string.monitor_phone_battery), percent(status.batteryPercentage), MonitorColors.Secondary)
+        WithTip(stringResource(R.string.tip_clock)) {
+            IconValue(R.drawable.ic_clock, status.time, clockCells, MonitorColors.Secondary)
+        }
+        val level = percent(status.batteryPercentage)
+        WithTip(stringResource(if (status.charging) R.string.tip_phone_battery_charging else R.string.tip_phone_battery, level)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BatteryGlyph(status.batteryPercentage, if (status.charging) BatteryMark.CHARGING else BatteryMark.NONE, batteryColor(status.batteryPercentage))
+                Value(level, PERCENT_CELLS, batteryColor(status.batteryPercentage))
+            }
+        }
     }
 }
 
-private data class PhoneStatusValues(val time: String, val batteryPercentage: Int?)
+private data class PhoneStatusValues(val time: String, val batteryPercentage: Int?, val charging: Boolean)
 
 /**
- * The time in the user's 12- or 24-hour format, and the battery as a whole percentage, or null
- * when the phone cannot say: `getIntProperty` returns `Integer.MIN_VALUE` on any error for apps
- * targeting API 28 or later (`BatteryManager`, SDK 37 source, read 2026-11-27).
+ * The date and the time to the second as the phone is set to show them: the date in Android's own
+ * short form for the user's language and region, and the time in their 12- or 24-hour choice.
+ * `DateFormat.getDateFormat` gives "the date in short form according to the context's locale", and
+ * `is24HourFormat` the user's clock preference (`android.text.format.DateFormat`, SDK 37 source,
+ * read 2026-11-27). Seconds need a pattern of their own, since the system's time format has none.
  */
-private fun readPhoneStatus(context: Context): PhoneStatusValues {
-    val capacity = context.getSystemService(BatteryManager::class.java)?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-    return PhoneStatusValues(DateFormat.getTimeFormat(context).format(Date()), capacity?.takeIf { it in 0..100 })
+private fun clockFormat(context: Context): SimpleDateFormat {
+    val locale = context.resources.configuration.locales[0]
+    val date = (DateFormat.getDateFormat(context) as? SimpleDateFormat)?.toPattern()
+        ?: DateFormat.getBestDateTimePattern(locale, "yMd")
+    val time = DateFormat.getBestDateTimePattern(locale, if (DateFormat.is24HourFormat(context)) "Hms" else "hms")
+    return SimpleDateFormat("$date $time", locale)
+}
+
+/** The most characters [format] takes: every month, a one- and a two-digit day, and two-digit hours. */
+private fun widestTime(format: SimpleDateFormat): Int {
+    val calendar = Calendar.getInstance()
+    return (0..11).flatMap { month -> listOf(1, 28).flatMap { day -> listOf(10, 11, 22, 23).map { hour -> Triple(month, day, hour) } } }
+        .maxOf { (month, day, hour) ->
+            calendar.set(2026, month, day, hour, 59, 59)
+            format.format(calendar.time).length
+        }
+}
+
+/**
+ * The date and time, the battery as a whole percentage, or null when the phone cannot say
+ * (`getIntProperty` returns `Integer.MIN_VALUE` on any error for apps targeting API 28 or later),
+ * and whether it is charging: plugged in and the level going up, or full (`BatteryManager`, SDK
+ * 37 source, read 2026-11-27).
+ */
+private fun readPhoneStatus(context: Context, clock: SimpleDateFormat): PhoneStatusValues {
+    val battery = context.getSystemService(BatteryManager::class.java)
+    return PhoneStatusValues(
+        time = clock.format(Date()),
+        batteryPercentage = battery?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)?.takeIf { it in 0..100 },
+        charging = battery?.isCharging == true,
+    )
 }
 
 /**
  * Shown only while battery optimisation is on, which may refuse the restart that resumes a capture
- * Android stopped (decision `0013`); a tap explains it, so it can be turned off before a night's
+ * Android stopped (decision `0013`); its tip explains it, so it can be turned off before a night's
  * recording.
  */
 @Composable
@@ -161,79 +229,142 @@ private fun BatteryOptimisationWarning() {
     val context = LocalContext.current
     val optimised = !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
     if (!optimised) return
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.size(36.dp)) {
-            Icon(
-                painterResource(R.drawable.ic_battery_alert),
-                contentDescription = stringResource(R.string.monitor_battery_optimised),
-                tint = MonitorColors.Warning,
-            )
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Text(
-                stringResource(R.string.monitor_battery_optimised_detail),
-                color = MonitorColors.Warning,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.widthIn(max = 320.dp).padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
+    WithTip(stringResource(R.string.monitor_battery_optimised_detail), tint = MonitorColors.Warning) {
+        Icon(painterResource(R.drawable.ic_battery_alert), contentDescription = null, tint = MonitorColors.Warning, modifier = Modifier.size(24.dp))
+    }
+}
+
+/** Shown only when the beat beep could not play: the phone would not open an audio track, or it failed. */
+@Composable
+private fun BeepWarning(error: String) {
+    WithTip(stringResource(R.string.monitor_beep_unavailable, error), tint = MonitorColors.Warning) {
+        Icon(painterResource(R.drawable.ic_volume_off), contentDescription = null, tint = MonitorColors.Warning, modifier = Modifier.size(24.dp))
     }
 }
 
 /**
- * Skin contact as an icon, lit with contact and dark without or while unknown; the strap's battery,
- * the gap count and the last RR interval as icons with their values, gaps amber when there are any.
+ * Skin contact as an icon: lit with contact, amber when the strap reports none, dark while unknown.
+ * The gap count, amber when there are any; the strap's battery; the last RR interval.
  */
 @Composable
 private fun VitalsGrid(contact: Boolean?, batteryPercentage: Int?, gaps: Int, lastRrMs: Int?) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column {
-            val contactDescription = when (contact) {
-                true -> R.string.monitor_contact_ok
-                false -> R.string.monitor_contact_none
-                null -> R.string.monitor_contact_unknown
+            val (contactTip, contactColor) = when (contact) {
+                true -> R.string.monitor_contact_ok to MonitorColors.Text
+                false -> R.string.monitor_contact_none to MonitorColors.Warning
+                null -> R.string.monitor_contact_unknown to DARK
             }
-            IconValue(R.drawable.ic_contact, stringResource(contactDescription), null, if (contact == true) MonitorColors.Text else DARK)
-            IconValue(R.drawable.ic_gap, stringResource(R.string.monitor_gaps_label), gaps.toString(), if (gaps > 0) MonitorColors.Warning else MonitorColors.Secondary)
+            WithTip(stringResource(contactTip)) {
+                Icon(painterResource(R.drawable.ic_contact), contentDescription = null, tint = contactColor, modifier = Modifier.size(ICON))
+            }
+            val gapColor = if (gaps > 0) MonitorColors.Warning else MonitorColors.Secondary
+            WithTip(stringResource(R.string.tip_gaps, gaps)) {
+                IconValue(R.drawable.ic_gap, gaps.toString(), GAP_CELLS, gapColor)
+            }
         }
         Column {
-            IconValue(R.drawable.ic_battery, stringResource(R.string.monitor_strap_battery), percent(batteryPercentage), MonitorColors.Secondary)
-            IconValue(R.drawable.ic_rr, stringResource(R.string.monitor_rr_label), lastRrMs?.toString() ?: stringResource(R.string.monitor_no_value), MonitorColors.Ecg)
+            val level = percent(batteryPercentage)
+            WithTip(stringResource(R.string.tip_strap_battery, level)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BatteryGlyph(batteryPercentage, BatteryMark.SENSOR, batteryColor(batteryPercentage))
+                    Value(level, PERCENT_CELLS, batteryColor(batteryPercentage))
+                }
+            }
+            val rr = lastRrMs?.toString() ?: stringResource(R.string.monitor_no_value)
+            WithTip(stringResource(R.string.tip_rr, rr)) {
+                IconValue(R.drawable.ic_rr, rr, RR_CELLS, MonitorColors.Ecg)
+            }
         }
     }
 }
 
 @Composable
-private fun IconValue(icon: Int, description: String?, value: String?, color: Color) {
+private fun IconValue(icon: Int, value: String, cells: Int, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(painterResource(icon), contentDescription = description, tint = color, modifier = Modifier.size(16.dp))
-        if (value != null) {
-            Text(value, color = color, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 4.dp))
+        Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(ICON))
+        Value(value, cells, color)
+    }
+}
+
+/** [value] in [cells] characters, so a longer or shorter value does not move what is beside it. */
+@Composable
+private fun Value(value: String, cells: Int, color: Color) {
+    Text(value.inCells(cells), color = color, fontFamily = MonitorMono, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 4.dp))
+}
+
+/** What a battery glyph carries inside it, to tell the phone's from the strap's. */
+private enum class BatteryMark { NONE, CHARGING, SENSOR }
+
+/**
+ * A battery on its side, filled to [percentage] from the left as the system status bar draws it,
+ * carrying [mark]: the strap's has the strap's sensor icon in it, the phone's a bolt while
+ * charging. The mark is cut out of the fill once that reaches past the middle, and drawn in the
+ * battery's colour before then, so it shows either way.
+ */
+@Composable
+private fun BatteryGlyph(percentage: Int?, mark: BatteryMark, color: Color) {
+    val sensor = painterResource(R.drawable.ic_sensor)
+    Canvas(Modifier.size(width = 18.dp, height = 10.dp)) {
+        val width = size.width
+        val height = size.height
+        val stroke = 1.dp.toPx()
+        val body = Size(width * 0.9f, height)
+        val level = (percentage ?: 0).coerceIn(0, 100)
+        drawRect(color, Offset(body.width, height * 0.3f), Size(width - body.width, height * 0.4f))
+        drawRoundRect(color, Offset.Zero, body, CornerRadius(1.5.dp.toPx()), style = Stroke(stroke))
+        drawRect(color, Offset(stroke, stroke), Size((body.width - 2 * stroke) * level / 100f, height - 2 * stroke))
+        val centre = Offset(body.width / 2, height / 2)
+        val markColor = if (level >= 50) MonitorColors.Background else color
+        when (mark) {
+            BatteryMark.NONE -> Unit
+            BatteryMark.CHARGING -> {
+                val bolt = Path().apply {
+                    moveTo(centre.x + height * 0.15f, height * 0.1f)
+                    lineTo(centre.x - height * 0.28f, height * 0.56f)
+                    lineTo(centre.x, height * 0.56f)
+                    lineTo(centre.x - height * 0.15f, height * 0.9f)
+                    lineTo(centre.x + height * 0.28f, height * 0.44f)
+                    lineTo(centre.x, height * 0.44f)
+                    close()
+                }
+                drawPath(bolt, markColor)
+            }
+            BatteryMark.SENSOR -> {
+                val side = height
+                translate(left = centre.x - side / 2, top = centre.y - side / 2) {
+                    with(sensor) { draw(Size(side, side), colorFilter = ColorFilter.tint(markColor)) }
+                }
+            }
         }
     }
 }
 
+/** Amber when low, as the system status bar warns. */
+private fun batteryColor(percentage: Int?): Color = if (percentage != null && percentage <= LOW_BATTERY_PERCENTAGE) MonitorColors.Warning else MonitorColors.Secondary
+
 @Composable
-private fun percent(pct: Int?): String =
-    if (pct == null) stringResource(R.string.monitor_no_value) else stringResource(R.string.monitor_percent, pct)
+private fun percent(percentage: Int?): String =
+    if (percentage == null) stringResource(R.string.monitor_no_value) else stringResource(R.string.monitor_percent, percentage)
 
 @Composable
 private fun HeartRateReadout(bpm: Int?) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(horizontalAlignment = Alignment.End) {
-            Text(stringResource(R.string.monitor_hr), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelMedium)
-            Text(stringResource(R.string.monitor_bpm), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall)
+    WithTip(stringResource(R.string.tip_hr)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(stringResource(R.string.monitor_hr), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.monitor_bpm), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall)
+            }
+            Text(
+                (bpm?.toString() ?: stringResource(R.string.monitor_no_value)).inCells(HEART_RATE_CELLS),
+                color = MonitorColors.Ecg,
+                fontSize = 44.sp,
+                lineHeight = 44.sp,
+                fontFamily = MonitorMono,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(start = 6.dp),
+            )
         }
-        Text(
-            bpm?.toString() ?: stringResource(R.string.monitor_no_value),
-            color = MonitorColors.Ecg,
-            fontSize = 44.sp,
-            lineHeight = 44.sp,
-            fontWeight = FontWeight.Light,
-            // Room for three digits, so the heart beside it stays put as the rate changes.
-            modifier = Modifier.padding(start = 6.dp).widthIn(min = 76.dp),
-        )
     }
 }
 
@@ -262,5 +393,16 @@ private fun StopButton(onStop: () -> Unit) {
     }
 }
 
+private val ICON = 16.dp
+
 /** An icon that is off: there, so the grid keeps its shape, but barely visible. */
 private val DARK = Color(0xFF3A3A3A)
+
+private const val LOW_BATTERY_PERCENTAGE = 15
+
+/** Room for 3-digit heart rates, 100%, 4-digit RR intervals in ms and 3-digit gap counts. */
+private const val HEART_RATE_CELLS = 3
+private const val PERCENT_CELLS = 4
+private const val RR_CELLS = 4
+private const val GAP_CELLS = 3
+

@@ -36,7 +36,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -50,6 +49,8 @@ import com.benwrk.jabjotjai.monitor.paused
 import com.benwrk.jabjotjai.monitor.positionNs
 import com.benwrk.jabjotjai.monitor.speed
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
+import com.benwrk.jabjotjai.ui.theme.MonitorMono
+import com.benwrk.jabjotjai.ui.theme.inCells
 
 /**
  * The capture's timeline and its controls, laid out like a video player's and kept quiet so the
@@ -128,13 +129,15 @@ fun PlaybackBar(
                             onSettings { it.copy(timeFromStart = !it.timeFromStart) }
                         }
                         .padding(horizontal = 8.dp),
+                    // Right-aligned, so the digits line up when the time above has a minus.
+                    horizontalAlignment = Alignment.End,
                 ) {
-                    Text(time, color = MonitorColors.Secondary, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelMedium)
+                    Text(time.inCells(TIME_CELLS), color = MonitorColors.Secondary, fontFamily = MonitorMono, style = MaterialTheme.typography.labelMedium)
                     Text(
-                        elapsedText(sessionSeconds ?: 0),
+                        elapsedText(sessionSeconds ?: 0).inCells(TIME_CELLS),
                         color = MonitorColors.Secondary.copy(alpha = 0.6f),
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = MonitorMono,
+                        style = MaterialTheme.typography.labelMedium,
                     )
                 }
                 LiveButton(live, onLive)
@@ -239,8 +242,9 @@ private fun SpeedButton(playback: Playback, onSpeed: (Float) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         Text(
-            stringResource(R.string.playback_speed, plainNumber(playback.speed)),
+            stringResource(R.string.playback_speed, plainNumber(playback.speed)).inCells(SPEED_CELLS),
             color = MonitorColors.Secondary,
+            fontFamily = MonitorMono,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.clickable { open = true }.padding(horizontal = 10.dp, vertical = 8.dp),
         )
@@ -301,3 +305,7 @@ private fun JumpButton(icon: Int, description: String, enabled: Boolean, onClick
         }
     }
 }
+
+/** Room for the times up to 99 hours, with the minus of a time behind live, and for "0.5×". */
+private const val TIME_CELLS = 9
+private const val SPEED_CELLS = 4
