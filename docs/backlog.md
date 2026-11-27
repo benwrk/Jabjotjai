@@ -161,7 +161,9 @@ difference is what the battery-management walkthrough below has to ask for.
 
 `AGENTS.md` ("Capture") requires it: vendor battery management can end a recording silently, so
 the app has to guide the user through exempting it, with the settings paths verified on the
-actual device. 0.1 has no such step. Done when a first-run checklist exists and each of its
+actual device. The monitor's amber battery icon now opens Android's own request to stop
+battery optimisation (decision `0017`), but there is no first-run step, and nothing yet covers
+One UI's own battery settings. Done when a first-run checklist exists and each of its
 settings paths has been checked on the test phone (Galaxy S25, Android 17, One UI 9.0), with the
 date.
 
@@ -240,9 +242,6 @@ showing another moment.
 
 ## Keep the monitor's indicators current
 
-- The amber battery-optimisation icon is read once and never again
-  (`BatteryOptimisationWarning` takes no state), so after the user turns optimisation off in
-  Settings and comes back it stays until the screen is rebuilt (read 2026-11-28).
 - A tip whose text changes never hides by itself, because its timer restarts on every change
   (`LaunchedEffect(tip)` in `Tip.kt`): the RR tip changes about once a second, within its
   timer. Tapping the icon again closes and at once reopens it (read in Compose UI 1.10.4's popup

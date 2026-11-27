@@ -131,6 +131,7 @@ your recordings.
 | Nearby devices (Bluetooth)                    | Finding and connecting to the strap. Never used for location.                 |
 | Notifications                                 | The recording's notification, shown while it runs.                            |
 | Foreground service, wake lock                 | Keeping the recording running with the screen off.                            |
+| Ignore battery optimisations                  | Asking Android, when you tap the amber battery icon, to let recordings run.   |
 | Companion device presence, background running | Declared by a library the app includes; the app's own code does not use them. |
 
 **Not there yet**

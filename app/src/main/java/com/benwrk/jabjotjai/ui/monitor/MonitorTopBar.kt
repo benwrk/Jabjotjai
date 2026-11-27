@@ -1,8 +1,12 @@
 package com.benwrk.jabjotjai.ui.monitor
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.PowerManager
+import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -46,6 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.currentHeartRate
@@ -229,16 +234,41 @@ private fun readPhoneStatus(context: Context, clock: SimpleDateFormat): PhoneSta
 
 /**
  * Shown only while battery optimisation is on, which may refuse the restart that resumes a capture
- * Android stopped (decision `0013`); its tip explains it, so it can be turned off before a night's
- * recording.
+ * Android stopped (decision `0013`). A tap asks Android to let the app run unrestricted (decision
+ * `0017`) and a long press explains why. It is looked at again whenever the monitor comes back on
+ * screen, so it goes once that has been allowed.
  */
 @Composable
 private fun BatteryOptimisationWarning() {
     val context = LocalContext.current
-    val optimised = !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+    val power = remember(context) { context.getSystemService(PowerManager::class.java) }
+    var optimised by remember { mutableStateOf(!power.isIgnoringBatteryOptimizations(context.packageName)) }
+    LifecycleResumeEffect(power) {
+        optimised = !power.isIgnoringBatteryOptimizations(context.packageName)
+        onPauseOrDispose {}
+    }
     if (!optimised) return
-    WithTip(stringResource(R.string.monitor_battery_optimised_detail), tint = MonitorColors.Warning) {
-        Icon(painterResource(R.drawable.ic_battery_alert), contentDescription = null, tint = MonitorColors.Warning, modifier = Modifier.size(24.dp))
+    WithTip(
+        stringResource(R.string.monitor_battery_optimised_detail),
+        tint = MonitorColors.Warning,
+        onClick = { askToRunUnrestricted(context) },
+    ) {
+        Icon(painterResource(R.drawable.ic_battery_alert), contentDescription = stringResource(R.string.monitor_battery_optimised), tint = MonitorColors.Warning, modifier = Modifier.size(24.dp))
+    }
+}
+
+/**
+ * Opens Android's request to let this app ignore battery optimisation, a dialog the
+ * `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission allows (`Settings` in the SDK 37 source, read
+ * 2026-11-28). Where a phone does not offer it, the list of apps and their battery optimisation
+ * opens instead.
+ */
+private fun askToRunUnrestricted(context: Context) {
+    val request = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", context.packageName, null))
+    try {
+        context.startActivity(request)
+    } catch (e: ActivityNotFoundException) {
+        context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
     }
 }
 

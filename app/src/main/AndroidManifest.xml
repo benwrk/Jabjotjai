@@ -18,6 +18,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Asking, from the monitor's battery warning, to be let off battery optimisation, so an
+         overnight capture is not stopped (decision 0017). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- The capture notification, and asking for it to be shown as a Live Update (a promoted
          ongoing notification) on Android 16 QPR2 and later. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

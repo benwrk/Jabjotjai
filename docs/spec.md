@@ -196,6 +196,9 @@ The current scope.
 2. **A fresh install shows two cascaded ECG rows, then heart-rate and RR rows**: two ECG rows
    cascaded into one sweep at 25 mm/s, then heart-rate and RR rows of 15 minutes each that sweep,
    in place of 0.3's ECG above the accelerometer. Rows kept by an earlier version stay as they were.
+3. **The amber battery icon takes the user to turning battery optimisation off**: a tap opens
+   Android's request to let the app run unrestricted (decision `0017`), and the icon goes once that
+   is allowed.
 
 ## Later
 
