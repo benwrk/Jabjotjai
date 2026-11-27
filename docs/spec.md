@@ -119,6 +119,9 @@ cannot end itself properly; it is noted and resumed afterwards instead.
    monospaced font that ships with the app, so the monitor looks the same on every phone, and each
    keeps a fixed width, so nothing moves as values change. On a narrow screen the bar takes two
    rows. How long the capture has run is shown under the timeline's time, aligned to it.
+9. **The notification** (also in 0.3): its first line is the heart rate and the connection, its
+   second the last RR interval, the gap count and the strap's battery. Its Stop opens the app and
+   asks first, as the monitor's stop does.
 
 ## Later
 

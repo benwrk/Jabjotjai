@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -53,6 +54,9 @@ import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import com.benwrk.jabjotjai.ui.theme.MonitorMono
 import com.benwrk.jabjotjai.ui.theme.inCells
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -380,28 +384,50 @@ private fun HeartRateReadout(bpm: Int?) {
     }
 }
 
+/**
+ * Asking whether to stop, from outside the monitor: the notification's Stop opens the app with
+ * this set, and the monitor's stop icon shows the same question for it.
+ */
+object StopQuestion {
+    private val mutableAsked = MutableStateFlow(false)
+    val asked: StateFlow<Boolean> = mutableAsked.asStateFlow()
+
+    fun ask() {
+        mutableAsked.value = true
+    }
+
+    fun answered() {
+        mutableAsked.value = false
+    }
+}
+
 /** Stop, after a question, so a stray tap does not end a night's recording. */
 @Composable
 private fun StopButton(onStop: () -> Unit) {
     var asking by remember { mutableStateOf(false) }
+    val askedFromOutside by StopQuestion.asked.collectAsState()
+    val close = {
+        asking = false
+        StopQuestion.answered()
+    }
     WithTip(stringResource(R.string.monitor_stop_tip), tint = MonitorColors.Alarm, onClick = { asking = true }) {
         Box(Modifier.size(40.dp).border(BorderStroke(1.dp, MonitorColors.Alarm), CircleShape), contentAlignment = Alignment.Center) {
             Icon(painterResource(R.drawable.ic_stop), contentDescription = null, tint = MonitorColors.Alarm, modifier = Modifier.size(20.dp))
         }
     }
-    if (asking) {
+    if (asking || askedFromOutside) {
         AlertDialog(
-            onDismissRequest = { asking = false },
+            onDismissRequest = close,
             title = { Text(stringResource(R.string.monitor_stop_title)) },
             text = { Text(stringResource(R.string.monitor_stop_body)) },
             confirmButton = {
                 TextButton(onClick = {
-                    asking = false
+                    close()
                     onStop()
                 }) { Text(stringResource(R.string.stop), color = MonitorColors.Alarm) }
             },
             dismissButton = {
-                TextButton(onClick = { asking = false }) { Text(stringResource(R.string.monitor_stop_keep)) }
+                TextButton(onClick = close) { Text(stringResource(R.string.monitor_stop_keep)) }
             },
         )
     }

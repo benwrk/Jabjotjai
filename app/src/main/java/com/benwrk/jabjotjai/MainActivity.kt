@@ -1,5 +1,6 @@
 package com.benwrk.jabjotjai
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -28,6 +29,7 @@ import com.benwrk.jabjotjai.capture.UncleanEnd
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
 import com.benwrk.jabjotjai.ui.BluetoothPermissionGate
 import com.benwrk.jabjotjai.ui.monitor.MonitorScreen
+import com.benwrk.jabjotjai.ui.monitor.StopQuestion
 import com.benwrk.jabjotjai.ui.picker.DevicePickerScreen
 import com.benwrk.jabjotjai.ui.picker.ResumeOffer
 import com.benwrk.jabjotjai.ui.picker.ScanViewModel
@@ -54,6 +56,27 @@ class MainActivity : ComponentActivity() {
                 App(scanViewModel, monitorViewModel)
             }
         }
+        askToStopIf(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        askToStopIf(intent)
+    }
+
+    /**
+     * The notification's Stop opens the app with [EXTRA_ASK_TO_STOP], so the monitor asks before
+     * stopping, as its own stop does. Only while a capture runs: there is nothing to stop otherwise.
+     */
+    private fun askToStopIf(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_ASK_TO_STOP, false) != true) return
+        intent.removeExtra(EXTRA_ASK_TO_STOP)
+        if (Capture.state.value is CaptureState.Running) StopQuestion.ask()
+    }
+
+    companion object {
+        const val EXTRA_ASK_TO_STOP = "com.benwrk.jabjotjai.extra.ASK_TO_STOP"
     }
 }
 

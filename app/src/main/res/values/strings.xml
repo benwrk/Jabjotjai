@@ -89,8 +89,10 @@
     <string name="display_beep_background">Keep beeping in the background</string>
     <string name="display_beep_background_hint">Go on beeping when the app is not on screen, with the screen off too, until the capture stops. Uses more battery.</string>
 
-    <string name="capture_notification_hr">HR %1$d bpm</string>
-    <string name="capture_notification_hr_none">HR —</string>
+    <string name="capture_notification_hr">%1$d bpm</string>
+    <string name="capture_notification_hr_none">— bpm</string>
+    <string name="capture_notification_title">%1$s · %2$s</string>
+    <string name="capture_notification_rr">RR %1$d ms</string>
     <string name="capture_notification_chip">HR %1$d</string>
     <string name="capture_notification_read_error">Cannot read the raw file</string>
 </resources>

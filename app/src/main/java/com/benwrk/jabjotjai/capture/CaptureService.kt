@@ -22,7 +22,6 @@ import com.benwrk.jabjotjai.monitor.DisplaySettingsStore
 import com.benwrk.jabjotjai.monitor.MonitorModel
 import com.benwrk.jabjotjai.monitor.beepAtBeats
 import com.benwrk.jabjotjai.monitor.beepGain
-import com.benwrk.jabjotjai.monitor.elapsedText
 import com.benwrk.jabjotjai.monitor.timeMonoNs
 import com.benwrk.jabjotjai.raw.AccRecord
 import com.benwrk.jabjotjai.raw.EcgRecord
@@ -346,20 +345,28 @@ class CaptureService : Service() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        val stop = PendingIntent.getService(this, 1, stopIntent(this), PendingIntent.FLAG_IMMUTABLE)
+        // Stop opens the app to ask first, as the monitor's own stop does, so a stray tap in the
+        // notification shade cannot end a recording.
+        val stop = PendingIntent.getActivity(
+            this,
+            STOP_REQUEST_CODE,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra(MainActivity.EXTRA_ASK_TO_STOP, true),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+        val connection = getString(
+            when (content.connection) {
+                RawEvents.CONNECTED -> R.string.monitor_connected
+                RawEvents.CONNECTING -> R.string.monitor_connecting
+                RawEvents.DISCONNECTED -> R.string.monitor_disconnected
+                else -> R.string.monitor_waiting
+            },
+        )
+        val heartRate = content.bpm?.let { getString(R.string.capture_notification_hr, it) } ?: getString(R.string.capture_notification_hr_none)
         val details = if (content.readFailed) {
             getString(R.string.capture_notification_read_error)
         } else {
             listOfNotNull(
-                content.elapsedSeconds?.let(::elapsedText),
-                getString(
-                    when (content.connection) {
-                        RawEvents.CONNECTED -> R.string.monitor_connected
-                        RawEvents.CONNECTING -> R.string.monitor_connecting
-                        RawEvents.DISCONNECTED -> R.string.monitor_disconnected
-                        else -> R.string.monitor_waiting
-                    },
-                ),
+                content.rrMs?.let { getString(R.string.capture_notification_rr, it) },
                 getString(R.string.monitor_gaps, content.gaps),
                 content.batteryPercentage?.let { getString(R.string.monitor_battery, it) },
             ).joinToString(" · ")
@@ -368,7 +375,7 @@ class CaptureService : Service() {
             ?: Icon.createWithResource(this, R.drawable.ic_stat_capture)
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(icon)
-            .setContentTitle(content.bpm?.let { getString(R.string.capture_notification_hr, it) } ?: getString(R.string.capture_notification_hr_none))
+            .setContentTitle(getString(R.string.capture_notification_title, heartRate, connection))
             .setContentText(details)
             // The elapsed time is part of the text instead of the system's chronometer: One UI drew
             // that against the end of the title, as "HR 72 bpm06:52" (seen 2026-11-27).
@@ -413,6 +420,7 @@ class CaptureService : Service() {
         private const val TAG = "CaptureService"
         private const val ACTION_START = "com.benwrk.jabjotjai.action.START_CAPTURE"
         private const val ACTION_STOP = "com.benwrk.jabjotjai.action.STOP_CAPTURE"
+        private const val STOP_REQUEST_CODE = 1
         private const val EXTRA_SENSOR_ID = "sensor_id"
         private const val EXTRA_SENSOR_NAME = "sensor_name"
         private const val EXTRA_SENSOR_ADDRESS = "sensor_address"
