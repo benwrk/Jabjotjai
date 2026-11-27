@@ -6,6 +6,28 @@ done or stops being true (git keeps the history), so every entry here is still t
 An entry says what is missing, why it matters, and what done looks like. An open question goes in
 `docs/decisions/` with `status: Open` instead, and work that waits on one links to it.
 
+## Sign every build with one stable key, kept off the build machine as well
+
+Raw files live in the app's private storage, and nothing exports them yet. Android accepts an
+update only if "the signing certificate of the update must be the same as the signing
+certificate of the installed app, or it must contain a valid proof-of-rotation"; otherwise "a
+user must first uninstall the currently installed version, which erases all app data from the
+device" (developer.android.com/google/play/app-updates, read 2026-11-27).
+
+Debug builds are signed with the debug keystore Android Studio generates on each machine. A
+build from another machine, from a fresh Android Studio install, or a first release build signed
+with a new key would therefore force an uninstall and delete every recording on the phone.
+
+Done when:
+
+- one keystore signs both debug and release builds, its location and passwords coming from
+  user-level Gradle properties rather than the repository;
+- the build fails loudly if they are missing, rather than falling back to the debug key;
+- the keystore has a backup that does not live on the build machine;
+- a decision records it.
+
+Until then, build and install only from the machine that installed the current build.
+
 ## Confirm the agent conventions in a fresh Claude Code session
 
 Two mechanisms can only fire at session start or once per session, so neither has been observed
