@@ -6,17 +6,16 @@
 
 **A Holter-style recorder for a chest-strap ECG sensor.**
 
-Polar H10 only · Android 13+ · No account · No internet access · Early prerelease
+Works with a Polar H10 · Android 13+ · No account · No internet access · Early prerelease
 
 It records everything the strap sends, ECG, beat-to-beat (RR) intervals, heart rate and motion,
 continuously, through exercise, sleep and everything in between, and keeps it, as received, on your
-phone. **It works only with the Polar H10 chest strap**; no other sensor is supported. It has only
-been tested on a Samsung Galaxy S25 with Android 17. Jabjotjai is not affiliated with Polar.
+phone. It works with the Polar H10 chest strap, and has only been tested on a Samsung Galaxy S25
+with Android 17. Jabjotjai is not affiliated with Polar.
 
 ## Get the app
 
-You need a Polar H10 chest strap, the only sensor the app works with. Download
-`jabjotjai-<version>.apk` from the
+You need a Polar H10 chest strap. Download `jabjotjai-<version>.apk` from the
 [latest release](https://github.com/benwrk/Jabjotjai/releases/latest), the newest on the list
 while every release is still a prerelease, and open it on a phone running Android 13 or later. A
 newer version installs over an older one and keeps your recordings; never uninstall to update,
@@ -118,7 +117,7 @@ Each release's notes, generated from its changes, are on the
 | | |
 | --- | --- |
 | Version | An early prerelease; see the [latest release](https://github.com/benwrk/Jabjotjai/releases/latest) |
-| Requires | Android 13 or later, and a Polar H10 chest strap: no other sensor works |
+| Requires | Android 13 or later, and a Polar H10 chest strap |
 | Tested on | Samsung Galaxy S25, Android 17, One UI 9.0 |
 | Install | The APK from [Releases](https://github.com/benwrk/Jabjotjai/releases): `jabjotjai-<version>.apk` is the release build, `jabjotjai-<version>-debug.apk` the debug build of the same commit |
 
