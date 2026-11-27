@@ -130,20 +130,39 @@ noted and resumed afterwards instead (decision `0013`).
 
 ## 0.4: chart rows
 
-The current scope.
+Built and seen working on the test phone: rows of one signal joined into one graph, cascaded
+across rows with one cursor, and up to five ECG rows cascaded.
 
-1. **The chart is a column of rows**, set from the cog menu: how many, and what each shows:
-   ECG, the accelerometer with X, Y and Z together, one accelerometer axis, heart rate, or RR
-   interval. Signals added later, such as HRV, join the same list.
+1. **The chart is a column of rows**, set from the cog menu: how many, from one to six, and what
+   each shows: ECG, the accelerometer with X, Y and Z together, or one accelerometer axis.
 2. **Neighbouring rows of the same signal are joined or cascaded.** Joined rows are one graph as
    tall as the rows together. Cascaded rows are one sweep folded across them, as a bedside
    monitor's cascaded ECG is: the trace runs across the top row and on into the next, with one
    cursor, so two ECG rows show twice as many seconds. A cascade's label and calibration pulse are
    shown once, on its top row.
-3. **Heart-rate and RR rows** plot the values the strap reported, on the same time axis as the
-   waveforms, each with its own scale.
+3. **Each signal has one scale** across all its rows, which its automatic scale fits to its
+   shortest graph; a single accelerometer axis is centred on its own level.
 4. **The choices are kept between runs.** The default is the layout 0.3 has: one ECG row above one
    accelerometer row.
+
+## 0.5: rows with their own speeds, and heart-rate and RR rows
+
+The current scope.
+
+1. **Each row is separate, cascaded or joined** with the row above. A separate row is a graph of
+   its own, which may show the same signal as the row above at another speed; cascaded and joined
+   rows are as in 0.4.
+2. **Speed is set per row.** A separate row has its own sweep speed; a cascaded or joined row has
+   the speed of the row it continues or joins, since a cascade at two speeds would break its trace.
+   A new row starts at the speed of the row above it, and the single sweep speed setting goes. Each
+   row's label gives its own speed.
+3. **Heart-rate and RR rows** plot the values the strap reported. Their speed is the time across
+   the row, set per row: 1, 5, 15, 30 or 60 minutes. Each sweeps by default, like the waveforms,
+   or scrolls with the newest value at its right edge, set per row. Their history comes from the
+   capture's own reader, which reads the whole file, so going back in time does not need minutes
+   of the file read again.
+4. **Gain stays one per signal**, so every ECG row is drawn at the same millivolts per millimetre
+   and rows can be compared directly.
 
 ## Later
 
