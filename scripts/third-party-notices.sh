@@ -152,10 +152,12 @@ cat <<'EOF'
 
 ## SIL Open Font License 1.1
 
-- JetBrains Mono, version 2.211, the monitor's font (`app/src/main/res/font/jetbrains_mono.ttf`)
+- JetBrains Mono, version 2.211, the monitor's font (`app/src/main/res/font/jetbrains_mono.ttf`).
+  The app also carries this licence text itself, in `assets/licenses/jetbrains-mono-OFL.txt`.
 
 EOF
-text "$licences/OFL-1.1-JetBrains-Mono.txt"
+# The app's own copy, so the notices quote exactly the text the app ships.
+text app/src/main/assets/licenses/jetbrains-mono-OFL.txt
 printf '\n## Licence texts\n\n### Apache License 2.0\n\n'
 text "$licences/Apache-2.0.txt"
 printf '\n### Polar software development kit licence\n\n'

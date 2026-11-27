@@ -189,14 +189,15 @@ https://creativecommons.org/publicdomain/zero/1.0/.
 
 ## SIL Open Font License 1.1
 
-- JetBrains Mono, version 2.211, the monitor's font (`app/src/main/res/font/jetbrains_mono.ttf`)
+- JetBrains Mono, version 2.211, the monitor's font (`app/src/main/res/font/jetbrains_mono.ttf`).
+  The app also carries this licence text itself, in `assets/licenses/jetbrains-mono-OFL.txt`.
 
 ```
 Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is copied below, and is also available with a FAQ at:
-https://openfontlicense.org
+
+This license is copied below, and is also available with a FAQ at: https://scripts.sil.org/OFL
 
 
 -----------------------------------------------------------
@@ -212,7 +213,7 @@ with others.
 
 The OFL allows the licensed fonts to be used, studied, modified and
 redistributed freely as long as they are not sold by themselves. The
-fonts, including any derivative works, can be bundled, embedded, 
+fonts, including any derivative works, can be bundled, embedded,
 redistributed and/or sold with any software provided that any reserved
 names are not used by derivative works. The fonts and derivatives,
 however, cannot be released under any other type of license. The
