@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The strap's skin contact, on the monitor's top bar: an ECG electrode, a snap in a ring with its
-     lead wire; tinted where it is drawn. -->
+<!-- The strap's skin contact, on the monitor's top bar: the chest strap seen from the skin side, a
+     band with its two electrode areas; tinted where it is drawn. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -9,15 +9,9 @@
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
-        android:pathData="M5,10a7,7 0 1,0 14,0a7,7 0 1,0 -14,0z" />
+        android:strokeWidth="1.8"
+        android:pathData="M5.5,7.5h13a4.5,4.5 0 0 1 0,9h-13a4.5,4.5 0 0 1 0,-9z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M9,10a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:pathData="M12,17v5" />
+        android:pathData="M5.5,10h3a2,2 0 0 1 0,4h-3a2,2 0 0 1 0,-4zM15.5,10h3a2,2 0 0 1 0,4h-3a2,2 0 0 1 0,-4z" />
 </vector>

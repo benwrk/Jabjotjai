@@ -6,17 +6,20 @@ import android.os.PowerManager
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -170,8 +173,8 @@ private fun PhoneStatus() {
         val level = percent(status.batteryPercentage)
         WithTip(stringResource(if (status.charging) R.string.tip_phone_battery_charging else R.string.tip_phone_battery, level)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BatteryGlyph(status.batteryPercentage, if (status.charging) BatteryMark.CHARGING else BatteryMark.NONE, batteryColor(status.batteryPercentage))
-                Value(level, PERCENT_CELLS, batteryColor(status.batteryPercentage))
+                IconSlot { BatteryGlyph(status.batteryPercentage, if (status.charging) BatteryMark.CHARGING else BatteryMark.NONE, batteryColor(status.batteryPercentage)) }
+                Value(level, PERCENT_CELLS, batteryColor(status.batteryPercentage), alignEnd = false)
             }
         }
     }
@@ -243,7 +246,7 @@ private fun BeepWarning(error: String) {
 }
 
 /**
- * Skin contact as an electrode with OK, OFF when the strap reports none, or NA while unknown.
+ * Skin contact as the strap with OK, OFF when the strap reports none, or a dash while unknown.
  * The gap count, amber when there are any; the strap's battery; the last RR interval.
  */
 @Composable
@@ -253,7 +256,7 @@ private fun VitalsGrid(contact: Boolean?, batteryPercentage: Int?, gaps: Int, la
             val (contactTip, contactWord, contactColor) = when (contact) {
                 true -> Triple(R.string.monitor_contact_ok, R.string.monitor_contact_ok_short, MonitorColors.Text)
                 false -> Triple(R.string.monitor_contact_none, R.string.monitor_contact_off_short, MonitorColors.Warning)
-                null -> Triple(R.string.monitor_contact_unknown, R.string.monitor_contact_unknown_short, DARK)
+                null -> Triple(R.string.monitor_contact_unknown, R.string.monitor_no_value, DARK)
             }
             WithTip(stringResource(contactTip)) {
                 IconValue(R.drawable.ic_contact, stringResource(contactWord), CONTACT_CELLS, contactColor)
@@ -267,7 +270,7 @@ private fun VitalsGrid(contact: Boolean?, batteryPercentage: Int?, gaps: Int, la
             val level = percent(batteryPercentage)
             WithTip(stringResource(R.string.tip_strap_battery, level)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    BatteryGlyph(batteryPercentage, BatteryMark.SENSOR, batteryColor(batteryPercentage))
+                    IconSlot { BatteryGlyph(batteryPercentage, BatteryMark.SENSOR, batteryColor(batteryPercentage)) }
                     Value(level, PERCENT_CELLS, batteryColor(batteryPercentage))
                 }
             }
@@ -282,15 +285,24 @@ private fun VitalsGrid(contact: Boolean?, batteryPercentage: Int?, gaps: Int, la
 @Composable
 private fun IconValue(icon: Int, value: String, cells: Int, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(ICON))
+        IconSlot { Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(ICON)) }
         Value(value, cells, color)
     }
 }
 
-/** [value] in [cells] characters, so a longer or shorter value does not move what is beside it. */
+/** Every icon in the same width, centred, so the values after them start in one column. */
 @Composable
-private fun Value(value: String, cells: Int, color: Color) {
-    Text(value.inCells(cells), color = color, fontFamily = MonitorMono, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 4.dp))
+private fun IconSlot(icon: @Composable () -> Unit) {
+    Box(Modifier.width(ICON_SLOT), contentAlignment = Alignment.Center) { icon() }
+}
+
+/**
+ * [value] in [cells] characters, so a longer or shorter value does not move what is beside it:
+ * right-aligned, so numbers in a column line up, or left-aligned under a longer value above it.
+ */
+@Composable
+private fun Value(value: String, cells: Int, color: Color, alignEnd: Boolean = true) {
+    Text(if (alignEnd) value.inCells(cells) else value.padEnd(cells), color = color, fontFamily = MonitorMono, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 4.dp))
 }
 
 /** What a battery glyph carries inside it, to tell the phone's from the strap's. */
@@ -372,8 +384,10 @@ private fun HeartRateReadout(bpm: Int?) {
 @Composable
 private fun StopButton(onStop: () -> Unit) {
     var asking by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { asking = true }, border = BorderStroke(1.dp, MonitorColors.Alarm)) {
-        Text(stringResource(R.string.stop), color = MonitorColors.Alarm)
+    WithTip(stringResource(R.string.monitor_stop_tip), tint = MonitorColors.Alarm, onClick = { asking = true }) {
+        Box(Modifier.size(40.dp).border(BorderStroke(1.dp, MonitorColors.Alarm), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(painterResource(R.drawable.ic_stop), contentDescription = null, tint = MonitorColors.Alarm, modifier = Modifier.size(20.dp))
+        }
     }
     if (asking) {
         AlertDialog(
@@ -394,6 +408,7 @@ private fun StopButton(onStop: () -> Unit) {
 }
 
 private val ICON = 16.dp
+private val ICON_SLOT = 18.dp
 
 /** An icon that is off: there, so the grid keeps its shape, but barely visible. */
 private val DARK = Color(0xFF3A3A3A)

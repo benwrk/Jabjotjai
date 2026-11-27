@@ -32,15 +32,22 @@ import kotlinx.coroutines.delay
 
 /**
  * [content] with a tip that a tap or a long press shows below it for a few seconds, longer for a
- * longer tip, and that also describes it to a screen reader.
+ * longer tip, and that also describes it to a screen reader. With [onClick], a tap does that
+ * instead and only a long press shows the tip.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun WithTip(tip: String, modifier: Modifier = Modifier, tint: Color = MonitorColors.Text, content: @Composable () -> Unit) {
+fun WithTip(
+    tip: String,
+    modifier: Modifier = Modifier,
+    tint: Color = MonitorColors.Text,
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
     var shown by remember { mutableStateOf(false) }
     Box(
         modifier
-            .combinedClickable(onClickLabel = tip, onLongClick = { shown = true }) { shown = !shown }
+            .combinedClickable(onClickLabel = tip, onLongClick = { shown = true }) { if (onClick != null) onClick() else shown = !shown }
             .semantics { contentDescription = tip },
     ) {
         content()
