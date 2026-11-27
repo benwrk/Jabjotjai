@@ -30,7 +30,8 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
      40 mm/g, each either fixed or automatic. Automatic is the default: it picks one of the same
      steps from the last few seconds of the trace, ignoring a second or two of outliers, and moves
      the band to keep the trace in its middle. The label always states the step in use, and the
-     1 mV calibration pulse follows the gain and the speed;
+     1 mV calibration pulse follows the gain and the speed, rising from the line where the trace
+     draws 0 mV, in a margin the sweep does not draw over;
    - a beep at each beat the strap reports, off by default. It sounds only while the monitor is
      on screen, follows the media volume, never interrupts other audio and never appears as media
      playing (decision `0009`).
