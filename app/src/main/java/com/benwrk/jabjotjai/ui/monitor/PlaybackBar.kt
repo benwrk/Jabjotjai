@@ -23,9 +23,11 @@ import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -173,8 +175,12 @@ private fun ThinSlider(
         disabledActiveTrackColor = MonitorColors.Secondary.copy(alpha = 0.3f),
         disabledInactiveTrackColor = MonitorColors.Secondary.copy(alpha = 0.3f),
     )
+    // Material 3 1.5 takes a custom thumb and track only on a slider that keeps a state of its own,
+    // so the state is kept here and follows [value], which the callers move as the knob is dragged.
+    val state = remember { SliderState(value) }
+    SideEffect { state.value = value }
     Slider(
-        value = value,
+        state = state,
         onValueChange = onValueChange,
         onValueChangeFinished = onValueChangeFinished,
         enabled = enabled,

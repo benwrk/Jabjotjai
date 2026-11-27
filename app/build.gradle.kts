@@ -43,7 +43,9 @@ if (!signingStoreFile.isFile) {
 android {
     namespace = "com.benwrk.jabjotjai"
     compileSdk {
-        version = release(37)
+        // 37.2, the newest stable platform in Google's SDK repository (2026-11-28). Compose 1.13
+        // refuses to build against anything before 37.1. CI installs the same platform.
+        version = release(37) { minorApiLevel = 2 }
     }
 
     defaultConfig {

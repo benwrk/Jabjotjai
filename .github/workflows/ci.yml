@@ -105,6 +105,13 @@ jobs:
         with:
           cache-provider: basic
 
+      # The platform app/build.gradle.kts compiles against (keep the two the same). Installed as a
+      # step of its own, so a failure to get it is not mistaken for a failed build.
+      - name: Install the Android platform the app compiles against
+        run: |
+          sdkmanager="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)"
+          "$sdkmanager" --install "platforms;android-37.2"
+
       - name: Write the keystore where the build reads it
         env:
           SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
