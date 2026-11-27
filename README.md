@@ -4,12 +4,14 @@
   <img src="docs/screenshots/monitor-landscape.gif" alt="The live monitor in landscape while the wearer moves: two cascaded ECG rows above the accelerometer's X, Y and Z, with heart rate, RR interval and the strap's status in the bar above" width="900">
 </p>
 
-A Holter-style recorder for a chest-strap ECG sensor, as an Android app.
+**A Holter-style recorder for a chest-strap ECG sensor.**
+
+Android 13+ · No account · No internet access · Version 0.4.0, prerelease
 
 It records everything the strap sends, ECG, beat-to-beat (RR) intervals, heart rate and motion,
 continuously, through exercise, sleep and everything in between, and keeps it, as received, on your
-phone. It works with the Polar H10, needs no account and has no internet access. Only tested on a
-Samsung Galaxy S25 with Android 17.
+phone. It works with the Polar H10, and has only been tested on a Samsung Galaxy S25 with Android
+17.
 
 ## Get the app
 
