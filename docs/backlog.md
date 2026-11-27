@@ -6,27 +6,23 @@ done or stops being true (git keeps the history), so every entry here is still t
 An entry says what is missing, why it matters, and what done looks like. An open question goes in
 `docs/decisions/` with `status: Open` instead, and work that waits on one links to it.
 
-## Sign every build with one stable key, kept off the build machine as well
+## Back up the signing keystore somewhere that survives losing the machine
 
-Raw files live in the app's private storage, and nothing exports them yet. Android accepts an
-update only if "the signing certificate of the update must be the same as the signing
-certificate of the installed app, or it must contain a valid proof-of-rotation"; otherwise "a
-user must first uninstall the currently installed version, which erases all app data from the
-device" (developer.android.com/google/play/app-updates, read 2026-11-27).
+Every build is signed with one stable key (decision `0010`), and the installed app accepts an
+update only from that key, so losing the keystore means the next build forces an uninstall,
+which erases every recording on the phone. The keystore lives only on the development machine.
+Done when a copy is kept somewhere that survives losing that machine, and a copy restored from it
+shows certificate SHA-256 `325a1e6688323ec147ea2eeb2dcd2c44d900b1e4301d2c996735863fcb5b4799` in
+`keytool -list`.
 
-Debug builds are signed with the debug keystore Android Studio generates on each machine. A
-build from another machine, from a fresh Android Studio install, or a first release build signed
-with a new key would therefore force an uninstall and delete every recording on the phone.
+## Replace the adopted debug key with a dedicated signing key
 
-Done when:
-
-- one keystore signs both debug and release builds, its location and passwords coming from
-  user-level Gradle properties rather than the repository;
-- the build fails loudly if they are missing, rather than falling back to the debug key;
-- the keystore has a backup that does not live on the build machine;
-- a decision records it.
-
-Until then, build and install only from the machine that installed the current build.
+The stable key is, for now, the development machine's debug key, with Android's default debug
+keystore passwords (decision `0010`). Android accepts an update signed with a different key only
+if it carries "a valid proof-of-rotation" (developer.android.com/google/play/app-updates, read
+2026-11-27). Done when a dedicated key signs every build, the test phone's installed build has
+updated to it without an uninstall (seen on the device, with the date), CI's secrets and expected
+certificate digest name the new key, and a decision records it.
 
 ## Prove a capture survives 30 minutes on battery with the screen off
 

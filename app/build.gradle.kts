@@ -13,6 +13,33 @@ val appVersionCode = appVersion.split('.').map(String::toInt).let { (major, mino
     major * 1_000_000 + minor * 1_000 + patch
 }
 
+// Every build, debug and release, is signed with the one stable key, so any build installs over
+// any other. Android accepts an update only if it is signed with the installed app's certificate
+// or carries a valid proof-of-rotation; otherwise the app must first be uninstalled, "which erases
+// all app data from the device" (developer.android.com/google/play/app-updates, read 2026-11-27),
+// every recording included. The keystore and its passwords come from Gradle properties set
+// outside the repository, and the build stops if any is missing rather than falling back to the
+// debug key of whichever machine it runs on. Decision 0010.
+val signingProperties = listOf(
+    "jabjotjaiSigningStoreFile",
+    "jabjotjaiSigningStorePassword",
+    "jabjotjaiSigningKeyAlias",
+    "jabjotjaiSigningKeyPassword",
+).associateWith { providers.gradleProperty(it).orNull.orEmpty() }
+val missingSigningProperties = signingProperties.filterValues(String::isEmpty).keys
+if (missingSigningProperties.isNotEmpty()) {
+    throw GradleException(
+        "Signing is not configured: set ${missingSigningProperties.joinToString()} in " +
+            "gradle.properties in the Gradle user home (~/.gradle unless GRADLE_USER_HOME is set), " +
+            "naming the project's keystore (decision 0010). An APK signed with any other key " +
+            "cannot be installed over the app without uninstalling it, which deletes its recordings."
+    )
+}
+val signingStoreFile = file(signingProperties.getValue("jabjotjaiSigningStoreFile"))
+if (!signingStoreFile.isFile) {
+    throw GradleException("jabjotjaiSigningStoreFile names $signingStoreFile, which is not a file.")
+}
+
 android {
     namespace = "com.benwrk.jabjotjai"
     compileSdk {
@@ -29,8 +56,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("stable") {
+            storeFile = signingStoreFile
+            storePassword = signingProperties.getValue("jabjotjaiSigningStorePassword")
+            keyAlias = signingProperties.getValue("jabjotjaiSigningKeyAlias")
+            keyPassword = signingProperties.getValue("jabjotjaiSigningKeyPassword")
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("stable")
+        }
         release {
+            signingConfig = signingConfigs.getByName("stable")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
