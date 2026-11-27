@@ -162,10 +162,11 @@ difference is what the battery-management walkthrough below has to ask for.
 `AGENTS.md` ("Capture") requires it: vendor battery management can end a recording silently, so
 the app has to guide the user through exempting it, with the settings paths verified on the
 actual device. The monitor's amber battery icon now opens Android's own request to stop
-battery optimisation (decision `0017`), but there is no first-run step, and nothing yet covers
-One UI's own battery settings. Done when a first-run checklist exists and each of its
-settings paths has been checked on the test phone (Galaxy S25, Android 17, One UI 9.0), with the
-date.
+battery optimisation (decision `0017`); allowing it there set One UI's own battery setting for
+the app to Unrestricted, and the icon went (seen 2026-11-28). There is no first-run step yet,
+and One UI's other battery management (sleeping apps, adaptive battery) is not covered. Done
+when a first-run checklist exists and each of its settings paths has been checked on the test
+phone (Galaxy S25, Android 17, One UI 9.0), with the date.
 
 ## Fit the monitor at the default text size and larger
 
