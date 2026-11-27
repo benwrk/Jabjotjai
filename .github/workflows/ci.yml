@@ -119,12 +119,35 @@ jobs:
       # ORG_GRADLE_PROJECT_<name> as the property <name> (observed 2026-11-27, Gradle 9.9.2), and
       # the build stops if any of the four is missing.
       - name: Build, unit-test and lint
+        id: build
         env:
           ORG_GRADLE_PROJECT_jabjotjaiSigningStoreFile: ${{ runner.temp }}/signing.keystore
           ORG_GRADLE_PROJECT_jabjotjaiSigningStorePassword: ${{ secrets.SIGNING_STORE_PASSWORD }}
           ORG_GRADLE_PROJECT_jabjotjaiSigningKeyAlias: ${{ secrets.SIGNING_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_jabjotjaiSigningKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew build
+
+      # Gradle reports a failed download the same way as a missing plugin, and only --debug shows
+      # which request failed and why (docs/memories/ci-plugin-not-found-can-be-a-network-failure.md).
+      # So when the build fails, this records what each repository answers this runner, and the
+      # lines of a --debug attempt that name a failed request. Only those lines are printed, into
+      # the masked job log; the --debug log itself is never uploaded.
+      - name: Record what the repositories answer
+        if: failure() && steps.build.outcome == 'failure'
+        env:
+          ORG_GRADLE_PROJECT_jabjotjaiSigningStoreFile: ${{ runner.temp }}/signing.keystore
+          ORG_GRADLE_PROJECT_jabjotjaiSigningStorePassword: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_jabjotjaiSigningKeyAlias: ${{ secrets.SIGNING_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_jabjotjaiSigningKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          marker=org/gradle/toolchains/foojay-resolver-convention/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin/1.0.0/org.gradle.toolchains.foojay-resolver-convention.gradle.plugin-1.0.0.pom
+          for url in "https://repo.maven.apache.org/maven2/$marker" "https://plugins.gradle.org/m2/$marker" \
+              https://dl.google.com/dl/android/maven2/ https://jitpack.io/; do
+            curl -sS -o /dev/null -w "%{http_code} in %{time_total}s  $url\n" "$url" || echo "curl failed: $url"
+          done
+          ./gradlew help --debug --no-configuration-cache > "$RUNNER_TEMP/gradle-debug.log" 2>&1 || true
+          grep -E "Could not (GET|HEAD)|Received status code|Caused by|timed out|refused" \
+            "$RUNNER_TEMP/gradle-debug.log" | sed -E 's/^[0-9T:.+-]+ //' | sort | uniq -c | sort -rn | head -40 || true
 
       # The notices must list exactly what the release build includes (decision 0015), so a
       # dependency change that is not reflected in them fails here.
