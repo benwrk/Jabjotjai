@@ -90,9 +90,10 @@ private fun App(scanViewModel: ScanViewModel, monitorViewModel: MonitorViewModel
     val state by Capture.state.collectAsState()
     // The monitor keeps its bars clear of the system bars and the camera cut-out itself, so that its
     // chart can reach under the cut-out (see MonitorScreen); every other screen keeps clear of both.
-    Scaffold(containerColor = MonitorColors.Background, contentWindowInsets = WindowInsets(0)) {
+    Scaffold(containerColor = MonitorColors.Background, contentWindowInsets = WindowInsets(0)) { frame ->
         val insets = if (state is CaptureState.Running) Modifier else Modifier.windowInsetsPadding(ScaffoldDefaults.contentWindowInsets)
-        Box(Modifier.fillMaxSize().then(insets)) {
+        // [frame] is only what the Scaffold's own bars take, none so far.
+        Box(Modifier.fillMaxSize().padding(frame).then(insets)) {
             BluetoothPermissionGate {
                 when (val current = state) {
                     is CaptureState.Running -> MonitorScreen(
