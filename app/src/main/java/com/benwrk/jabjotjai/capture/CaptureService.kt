@@ -108,7 +108,7 @@ class CaptureService : Service() {
         val start = clock.stamp()
         startForeground(
             NOTIFICATION_ID,
-            notification(start.wallMs, NotificationContent.STARTING),
+            notification(NotificationContent.STARTING),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
         )
         wakeLock = getSystemService(PowerManager::class.java)
@@ -125,7 +125,7 @@ class CaptureService : Service() {
             newSession.start(header)
             // The file exists from here on, which a tail needs.
             liveScope.launch { readLive(file) }
-            liveScope.launch { keepNotificationCurrent(start.wallMs) }
+            liveScope.launch { keepNotificationCurrent() }
             liveScope.launch { beepWhileWanted() }
             session = newSession
             link = PolarH10Link(api, sensorId, sensorAddress, newSession, clock, scope).also { it.connect() }
@@ -249,7 +249,7 @@ class CaptureService : Service() {
      * read 2026-11-27), so it posts at most once a second, and only when the content has changed;
      * see [NotificationContent.of] for what is left out while the screen is off.
      */
-    private suspend fun keepNotificationCurrent(startWallMs: Long) {
+    private suspend fun keepNotificationCurrent() {
         val manager = getSystemService(NotificationManager::class.java)
         val power = getSystemService(PowerManager::class.java)
         var shown: NotificationContent? = null
@@ -257,7 +257,7 @@ class CaptureService : Service() {
             val live = Capture.live.value
             val content = NotificationContent.of(live.snapshot, SystemPhoneClock.monoNs(), live.readError != null, power.isInteractive)
             if (content != shown && running) {
-                manager.notify(NOTIFICATION_ID, notification(startWallMs, content))
+                manager.notify(NOTIFICATION_ID, notification(content))
                 shown = content
             }
             delay(NOTIFICATION_UPDATE_MS)
@@ -288,7 +288,7 @@ class CaptureService : Service() {
         }
     }
 
-    private fun notification(startWallMs: Long, content: NotificationContent): Notification {
+    private fun notification(content: NotificationContent): Notification {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, getString(R.string.capture_channel_name), NotificationManager.IMPORTANCE_LOW),
@@ -325,8 +325,12 @@ class CaptureService : Service() {
             .setContentText(details)
             // The elapsed time is part of the text instead of the system's chronometer: One UI drew
             // that against the end of the title, as "HR 72 bpm06:52" (seen 2026-11-27).
-            .setWhen(startWallMs)
             .setShowWhen(false)
+            // `when` is the time of what the notification shows, not the capture's start. One UI's
+            // default "Sort notifications: By time" puts the newest first, and with the start time
+            // every later notification sorted ahead of this one, until its icon fell behind the
+            // three the status bar shows (seen 2026-11-27).
+            .setWhen(SystemPhoneClock.wallMs())
             // The owner's choice: heart rate shows on the lock screen. PUBLIC is documented as "Show
             // this notification in its entirety on all lockscreens" (Notification.VISIBILITY_PUBLIC,
             // SDK 37 source, read 2026-11-27).
