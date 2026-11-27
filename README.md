@@ -1,7 +1,7 @@
 # Jabjotjai
 
 <p align="center">
-  <img src="docs/screenshots/monitor-landscape.gif" alt="The live monitor in landscape while the wearer moves: two cascaded ECG rows above the accelerometer's X, Y and Z, with heart rate, RR interval and the strap's status in the bar above" width="900">
+  <img src="docs/screenshots/monitor-landscape.gif" alt="The live monitor in landscape while the wearer moves: ECG, the accelerometer's X, Y and Z, and 15-minute heart-rate and RR trends, with the strap's status in the bar above" width="900">
 </p>
 
 **A Holter-style recorder for a chest-strap ECG sensor.**
@@ -17,17 +17,22 @@ phone. It works with the Polar H10, and has only been tested on a Samsung Galaxy
 
 Download `jabjotjai-<version>.apk` from the
 [latest release](https://github.com/benwrk/Jabjotjai/releases/latest), the newest on the list
-while every release is still a prerelease, and open it on a phone running Android 13 or later. A newer version installs over an older one and keeps your recordings; never
-uninstall to update, because uninstalling deletes them.
+while every release is still a prerelease, and open it on a phone running Android 13 or later. A
+newer version installs over an older one and keeps your recordings; never uninstall to update,
+because uninstalling deletes them.
 
 <table align="center">
   <tr>
-    <td><img src="docs/screenshots/rewinding.gif" alt="Pausing the capture, dragging the timeline back while the monitor follows, and playing on from there" width="400"></td>
-    <td><img src="docs/screenshots/cascaded-ecg.png" alt="Five ECG rows cascaded into one long sweep" width="400"></td>
-    <td rowspan="2"><img src="docs/screenshots/monitor-portrait.png" alt="The monitor in portrait, with the top bar on two rows" width="170"></td>
+    <td><img src="docs/screenshots/rewinding.gif" alt="Pausing, then dragging the timeline back into an earlier file of a resumed recording while the monitor follows, and playing on from there" width="400"></td>
+    <td><img src="docs/screenshots/monitor-fast-slow.png" alt="The same ECG at 25 mm/s and at 6.25 mm/s, above heart-rate and RR trends" width="400"></td>
+    <td rowspan="3"><img src="docs/screenshots/monitor-portrait.png" alt="The monitor in portrait: fast and slow ECG above heart-rate and RR trends" width="170"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/chart-rows.png" alt="The display settings: choosing what each chart row shows" width="400"></td>
+    <td><img src="docs/screenshots/monitor-trends.png" alt="ECG above 15-minute heart-rate and RR trends, broken where the recording resumed" width="400"></td>
+    <td><img src="docs/screenshots/chart-rows.png" alt="The display settings: heart-rate and RR rows, each with its time span and whether it sweeps or scrolls" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cascaded-ecg.png" alt="Five ECG rows cascaded into one long sweep" width="400"></td>
     <td><img src="docs/screenshots/strap-picker.png" alt="Picking the strap from a scan of nearby straps" width="400"></td>
   </tr>
 </table>
@@ -47,7 +52,8 @@ uninstall to update, because uninstalling deletes them.
   or join the row above into one taller graph, or cascade on from it into one long sweep, the way
   a bedside monitor folds a long ECG strip across its screen.
 - **Heart-rate and RR trends**: rows that plot the values the strap reported across 1 to 60
-  minutes, sweeping like the waveforms or scrolling with the newest value at the edge.
+  minutes, sweeping like the waveforms or scrolling with the newest value at the edge. They reach
+  back through a recording that resumed, with the time in between shown as a break.
 - **An optional beep at each beat**, with its own volume, in the foreground or in the background
   too.
 - **Nothing is hidden by the display**: a peak that runs off the edge of its row is drawn on the
@@ -57,7 +63,8 @@ uninstall to update, because uninstalling deletes them.
 **Rewind the recording while it is still running**
 
 - **A timeline like a video player's**: pause, drag to any moment, jump 15 seconds back or
-  forward, replay at 0.5× to 8×, and return to live with one tap.
+  forward, replay at 0.5× to 8×, and return to live with one tap. It spans the whole recording,
+  including the time before it resumed, with the gap between kept as a gap.
 - **The past is shown exactly as it was received**, read back from the recording itself.
 
 **Keeps recording when you are not looking**
@@ -86,6 +93,9 @@ uninstall to update, because uninstalling deletes them.
 
 ## What's new
 
+- **Trends and rewinding across a resumed recording**: when a recording resumes after an update
+  or a stop, the heart-rate and RR rows and the timeline reach back through the earlier part too,
+  with the time in between shown as a break.
 - **Heart-rate and RR rows**, plotting the strap's values across 1 to 60 minutes.
 - **Rows with their own speeds**: a row can be a separate graph at its own sweep speed, so the
   same ECG can be shown fast and slow at once.
