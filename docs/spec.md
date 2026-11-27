@@ -80,8 +80,12 @@ running, the way a live video stream can be rewound.
 
 ## 0.3: captures that outlast the app being stopped
 
-The current scope (decision `0013`). When Android stops the app, nothing of it runs, so a capture
-cannot end itself properly; it is noted and resumed afterwards instead.
+Built and seen working on the test phone, except three things in `docs/backlog.md` ("Finish
+proving 0.3 on the test phone"): the restart after Android stops the app (item 2), Force stop (item
+3) and swiping the app away (item 5). The owner chose to release 0.3 before those were seen.
+
+When Android stops the app, nothing of it runs, so a capture cannot end itself properly; it is
+noted and resumed afterwards instead (decision `0013`).
 
 1. **A capture that has no `end` record is noted afterwards**, in a separate ending note beside
    its file, which is never reopened: why it ended, from Android's record of why the app's
