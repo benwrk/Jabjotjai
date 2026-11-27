@@ -380,11 +380,9 @@ owner has chosen.
 - Polar's SDK brings in old versions with published advisories (OSV, 2026-11-28): gson 2.8.5,
   okhttp 3.14.9, okio 1.17.2, commons-io 2.11.0, protobuf-javalite 3.20.0. Without the INTERNET
   permission the HTTP stack is inert; protobuf parses what the strap sends.
-- Nothing proposes updates to the pinned actions or dependencies.
 
-Done when verification metadata covers every artifact, each advisory is either resolved by a
-newer version or recorded as not reachable, and Dependabot or the like watches at least the
-actions.
+Done when verification metadata covers every artifact, and each advisory is either resolved by a
+newer version or recorded as not reachable.
 
 ## Close smaller gaps in CI and the repository
 
