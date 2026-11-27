@@ -67,15 +67,15 @@ First written by app 0.1.0.
 
 The first line.
 
-| Field          | Type   | Meaning                                                                                |
-| -------------- | ------ | -------------------------------------------------------------------------------------- |
-| `schema`       | string | `"1.0"`                                                                                |
-| `session`      | string | The file's session id                                                                  |
-| `app`          | string | App version name and code, such as `"0.1.0 (1000)"`                                    |
-| `sdk`          | string | Polar BLE SDK version                                                                  |
-| `phone`        | object | `make`, `model`, `android` (release, as a string) and `api` (API level, an integer)    |
-| `start`        | object | `wall_ms` and `mono_ns` when the file was created                                      |
-| `sensor`       | object | `id`, the Polar device id, and `name`, its Bluetooth name                              |
+| Field          | Type   | Meaning                                                                                                |
+|----------------|--------|--------------------------------------------------------------------------------------------------------|
+| `schema`       | string | `"1.0"`                                                                                                |
+| `session`      | string | The file's session id                                                                                  |
+| `app`          | string | App version name and code, such as `"0.1.0 (1000)"`                                                    |
+| `sdk`          | string | Polar BLE SDK version                                                                                  |
+| `phone`        | object | `make`, `model`, `android` (release, as a string) and `api` (API level, an integer)                    |
+| `start`        | object | `wall_ms` and `mono_ns` when the file was created                                                      |
+| `sensor`       | object | `id`, the Polar device id, and `name`, its Bluetooth name                                              |
 | `sensor_epoch` | string | `"2000-01-01"`. The SDK documents the date ("The epoch of timestamp is 1.1.2000") but not a time zone. |
 
 ### `event`
@@ -83,18 +83,18 @@ The first line.
 Something that happened to the connection or a stream. Every event has `wall_ms`, `mono_ns` and
 `event`. Only the fields that apply to that event are present.
 
-| `event`          | Fields                                                                                                     |
-| ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| `connecting`     |                                                                                                            |
-| `connected`      |                                                                                                            |
-| `disconnected`   | `reason` and `recovery`, the SDK's names; `gatt_status` and `device_command` when the SDK provides them    |
-| `feature_ready`  | `feature`, the SDK's feature name                                                                          |
-| `device_info`    | `key` and `value`, one Device Information item each                                                        |
-| `battery`        | `level_pct`                                                                                                |
-| `settings`       | `stream`; `available`, every value offered per setting; `selected`, the value requested per setting         |
-| `stream_started` | `stream`                                                                                                   |
-| `stream_error`   | `stream`, `message`                                                                                        |
-| `ble_power`      | `value`: `on` or `off`, when the phone's Bluetooth is switched                                             |
+| `event`          | Fields                                                                                                  |
+|------------------|---------------------------------------------------------------------------------------------------------|
+| `connecting`     |                                                                                                         |
+| `connected`      |                                                                                                         |
+| `disconnected`   | `reason` and `recovery`, the SDK's names; `gatt_status` and `device_command` when the SDK provides them |
+| `feature_ready`  | `feature`, the SDK's feature name                                                                       |
+| `device_info`    | `key` and `value`, one Device Information item each                                                     |
+| `battery`        | `level_pct`                                                                                             |
+| `settings`       | `stream`; `available`, every value offered per setting; `selected`, the value requested per setting     |
+| `stream_started` | `stream`                                                                                                |
+| `stream_error`   | `stream`, `message`                                                                                     |
+| `ble_power`      | `value`: `on` or `off`, when the phone's Bluetooth is switched                                          |
 
 Setting names in `available` and `selected`: `rate_hz`, `bits`, `channels`, and `range_g` for the
 accelerometer's range in g. A range on any other stream is written as `range`, because the SDK
@@ -104,12 +104,12 @@ does not document its unit.
 
 One ECG frame.
 
-| Field     | Type          | Meaning                                    |
-| --------- | ------------- | ------------------------------------------ |
-| `wall_ms` | integer       | When the phone received the frame          |
-| `mono_ns` | integer       | When the phone received the frame          |
-| `t_ns`    | integer array | Sensor timestamp of each sample            |
-| `uV`      | integer array | Each sample's voltage, in microvolts        |
+| Field     | Type          | Meaning                              |
+|-----------|---------------|--------------------------------------|
+| `wall_ms` | integer       | When the phone received the frame    |
+| `mono_ns` | integer       | When the phone received the frame    |
+| `t_ns`    | integer array | Sensor timestamp of each sample      |
+| `uV`      | integer array | Each sample's voltage, in microvolts |
 
 The two arrays have the same length.
 
@@ -123,16 +123,16 @@ acceleration on each axis in milli-g, including gravity. All four arrays have th
 One heart-rate notification. It carries no sensor timestamp: `wall_ms` and `mono_ns`, when the
 phone received it, are the only time it has.
 
-| Field               | Type          | Meaning                                                        |
-| ------------------- | ------------- | -------------------------------------------------------------- |
-| `bpm`               | integer       | Heart rate as the sensor reports it                            |
+| Field               | Type          | Meaning                                                                  |
+|---------------------|---------------|--------------------------------------------------------------------------|
+| `bpm`               | integer       | Heart rate as the sensor reports it                                      |
 | `rr_1024`           | integer array | R-R intervals in 1/1024 s, as the Bluetooth heart-rate service sent them |
-| `rr_ms`             | integer array | The same intervals, as the SDK converted them to milliseconds  |
-| `rr_available`      | boolean       | Whether the notification carried R-R intervals                 |
-| `contact`           | boolean       | Whether the sensor reports skin contact                        |
-| `contact_supported` | boolean       | Whether the sensor reports contact at all                      |
-| `corrected_bpm`     | integer       | The SDK's corrected heart rate; 0 when unavailable             |
-| `ppg_quality`       | integer       | The SDK's optical signal quality; 0 on a sensor without one    |
+| `rr_ms`             | integer array | The same intervals, as the SDK converted them to milliseconds            |
+| `rr_available`      | boolean       | Whether the notification carried R-R intervals                           |
+| `contact`           | boolean       | Whether the sensor reports skin contact                                  |
+| `contact_supported` | boolean       | Whether the sensor reports contact at all                                |
+| `corrected_bpm`     | integer       | The SDK's corrected heart rate; 0 when unavailable                       |
+| `ppg_quality`       | integer       | The SDK's optical signal quality; 0 on a sensor without one              |
 
 ### `gap`
 

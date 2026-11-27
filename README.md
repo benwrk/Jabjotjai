@@ -114,23 +114,23 @@ Each release's notes, generated from its changes, are on the
 
 ## App info
 
-| | |
-| --- | --- |
-| Version | An early prerelease; see the [latest release](https://github.com/benwrk/Jabjotjai/releases/latest) |
-| Requires | Android 13 or later, and a Polar H10 chest strap |
-| Tested on | Samsung Galaxy S25, Android 17, One UI 9.0 |
-| Install | The APK from [Releases](https://github.com/benwrk/Jabjotjai/releases): `jabjotjai-<version>.apk` is the release build, `jabjotjai-<version>-debug.apk` the debug build of the same commit |
+|           |                                                                                                                                                                                           |
+|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Version   | An early prerelease; see the [latest release](https://github.com/benwrk/Jabjotjai/releases/latest)                                                                                        |
+| Requires  | Android 13 or later, and a Polar H10 chest strap                                                                                                                                          |
+| Tested on | Samsung Galaxy S25, Android 17, One UI 9.0                                                                                                                                                |
+| Install   | The APK from [Releases](https://github.com/benwrk/Jabjotjai/releases): `jabjotjai-<version>.apk` is the release build, `jabjotjai-<version>-debug.apk` the debug build of the same commit |
 
 Every build is signed with the same key, so a newer version installs over an older one and keeps
 your recordings.
 
 **Permissions**
 
-| Permission                          | Why                                                           |
-| ----------------------------------- | ------------------------------------------------------------- |
-| Nearby devices (Bluetooth)          | Finding and connecting to the strap. Never used for location. |
-| Notifications                       | The recording's notification, shown while it runs.            |
-| Foreground service, wake lock       | Keeping the recording running with the screen off.            |
+| Permission                                    | Why                                                                           |
+|-----------------------------------------------|-------------------------------------------------------------------------------|
+| Nearby devices (Bluetooth)                    | Finding and connecting to the strap. Never used for location.                 |
+| Notifications                                 | The recording's notification, shown while it runs.                            |
+| Foreground service, wake lock                 | Keeping the recording running with the screen off.                            |
 | Companion device presence, background running | Declared by a library the app includes; the app's own code does not use them. |
 
 **Not there yet**
