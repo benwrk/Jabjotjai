@@ -24,6 +24,26 @@ if it carries "a valid proof-of-rotation" (developer.android.com/google/play/app
 updated to it without an uninstall (seen on the device, with the date), CI's secrets and expected
 certificate digest name the new key, and a decision records it.
 
+## Finish proving 0.3 on the test phone
+
+Seen working on 2026-11-27: an update during a capture resumed it into a new file whose header
+names the old one, and wrote the old one's ending note with reason `PACKAGE_UPDATED`, twice; and
+the offer to resume appeared after a capture was left unfinished. Not yet seen:
+
+- **A kill that Android restarts** (`START_STICKY`): kill the app's process during a capture,
+  for example with `adb shell run-as com.benwrk.jabjotjai kill -9 <pid>`, and see whether the
+  service is re-created and allowed to start in the foreground with battery optimisation on,
+  which the documentation does not say (decision `0013`).
+- **Force stop**: the capture must not resume by itself, and the offer must appear on next open.
+- **Swiping the app away** from recent apps must not stop a capture.
+- **The first update test resumed nothing.** The app was on screen, Android reopened it, and its
+  picker wrote the note and showed the offer, but the update receiver left no sign it ran. That
+  build did not log from the receiver; the receiver has logged since, and both later updates
+  resumed. Mechanism unconfirmed: repeat an update with the monitor on screen and read
+  `UpdateReceiver` in logcat.
+
+Done when each has been seen on the test phone, with the date, and the raw files checked.
+
 ## Prove a capture survives 30 minutes on battery with the screen off
 
 `docs/spec.md` 0.1 item 4, staying connected in the background, is the one 0.1 requirement not
