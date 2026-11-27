@@ -166,7 +166,8 @@ Built and seen working on the test phone.
 
 ## 0.6: trends across a resumed capture
 
-The current scope.
+Built and seen working on the test phone, except moving an earlier file's times after a restart
+(item 2), which is covered by a unit test only; the phone was not restarted during a capture.
 
 1. **Heart-rate and RR rows reach back through a resumed capture.** A capture resumed after Android
    stopped the app, an update or the offer to resume is a new file whose header names the one it
