@@ -20,10 +20,13 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         // The Polar BLE SDK is published only through JitPack, which builds artifacts from GitHub
-        // on request. Restricted to Polar's group so no other dependency can resolve from it.
-        maven {
-            url = uri("https://jitpack.io")
-            content { includeGroup("com.github.polarofficial") }
+        // on request. Polar's group is looked for there and nowhere else, and nothing else is looked
+        // for there. A plain content filter would not do the first: "Filters declared using the
+        // repository-level content filter are not exclusive" (Gradle 9.9.2 docs, "Filtering
+        // repository content", read 2026-11-28).
+        exclusiveContent {
+            forRepository { maven { url = uri("https://jitpack.io") } }
+            filter { includeGroup("com.github.polarofficial") }
         }
     }
 }

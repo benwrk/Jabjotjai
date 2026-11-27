@@ -377,18 +377,16 @@ owner has chosen.
 
 - The Gradle 9.9.2 upgrade dropped `distributionSha256Sum`, so the distribution, which runs with
   the signing secrets in CI, is not checked, and the wrapper jar is still the one from 9.0 or 9.1.
-- `settings.gradle.kts` limits JitPack to Polar's group but not the other way, so Google and
-  Maven Central are asked for `com.github.polarofficial` first (Gradle 9.9.2 docs, "Filtering
-  repository content": content filters "are not exclusive"), and there is no
-  `gradle/verification-metadata.xml`.
+- There is no `gradle/verification-metadata.xml`, so no artifact's checksum is checked. JitPack
+  is now an exclusive repository for Polar's group.
 - Polar's SDK brings in old versions with published advisories (OSV, 2026-11-28): gson 2.8.5,
   okhttp 3.14.9, okio 1.17.2, commons-io 2.11.0, protobuf-javalite 3.20.0. Without the INTERNET
   permission the HTTP stack is inert; protobuf parses what the strap sends.
 - Nothing proposes updates to the pinned actions or dependencies.
 
-Done when the wrapper is regenerated with its checksum, JitPack is an exclusive repository,
-verification metadata covers every artifact, each advisory is either resolved by a newer version
-or recorded as not reachable, and Dependabot or the like watches at least the actions.
+Done when the wrapper is regenerated with its checksum, verification metadata covers every
+artifact, each advisory is either resolved by a newer version or recorded as not reachable, and
+Dependabot or the like watches at least the actions.
 
 ## Close smaller gaps in CI and the repository
 
@@ -401,11 +399,8 @@ or recorded as not reachable, and Dependabot or the like watches at least the ac
 - `AGENTS.md` says the hook and CI reject a commit message with a body; both check only the
   subject. The hook also lets any subject starting "Merge " through, and its attribution pattern
   is not anchored, so a subject containing it is deleted.
-- `.gitattributes` leaves `app/src/main/assets/` to line-ending conversion, so a Windows build
-  ships the licence text with CRLF where CI's has LF; `gradlew`, `*.bat` and `*.jar` have no rule.
-- `.gitignore` has no `*.jks` or `*.keystore`; R8's `packageScope` and the foojay plugin are kept
-  from the template without a reason given; `signers_of` in `ci.yml` checks output, not exit
-  status.
+- R8's `packageScope` and the foojay plugin are kept from the template without a reason given;
+  `signers_of` in `ci.yml` checks output, not exit status.
 
 Done when each is fixed or recorded as intended.
 
