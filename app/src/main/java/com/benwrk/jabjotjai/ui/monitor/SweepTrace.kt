@@ -100,4 +100,4 @@ private fun Path.edge(fromX: Float, toX: Float, y: Float, minLengthPx: Float) {
 }
 
 /** The blank stretch ahead of the cursor, as a fraction of the sweep: one fortieth. */
-private const val ERASE_FRACTION = 40L
+internal const val ERASE_FRACTION = 40L

@@ -1,7 +1,7 @@
 package com.benwrk.jabjotjai.monitor
 
-/** What a row of the chart shows. */
-enum class RowSignal {
+/** What a row of the chart shows: a waveform, or, if [trend], a value plotted over minutes. */
+enum class RowSignal(val trend: Boolean = false) {
     ECG,
 
     /** The accelerometer, X, Y and Z together on one scale. */
@@ -9,7 +9,28 @@ enum class RowSignal {
     ACC_X,
     ACC_Y,
     ACC_Z,
+
+    /** Heart rate as the strap reported it. */
+    HR(trend = true),
+
+    /** Each RR interval the strap reported. */
+    RR(trend = true),
 }
+
+/** The time across a heart-rate or RR row. */
+enum class TrendSpan(val minutes: Int) {
+    MIN_1(1),
+    MIN_5(5),
+    MIN_15(15),
+    MIN_30(30),
+    MIN_60(60),
+    ;
+
+    val ns: Long get() = minutes * 60_000_000_000L
+}
+
+/** How a heart-rate or RR row moves: sweeping like the waveforms, or scrolling with the newest value at its right edge. */
+enum class TrendMotion { SWEEP, SCROLL }
 
 /** How a row stands to the row above it, when both show the same signal. */
 enum class RowRelation {
@@ -24,14 +45,21 @@ enum class RowRelation {
 }
 
 /**
- * One row of the chart: what it shows, how it stands to the row above, and its sweep speed, which
- * counts only where it starts a graph or a cascade. A relation other than [RowRelation.SEPARATE]
+ * One row of the chart: what it shows, how it stands to the row above, and its sweep speed, or for a
+ * heart-rate or RR row its span and motion, which count only where it starts a graph or a cascade. A relation other than [RowRelation.SEPARATE]
  * only counts when the row above shows the same signal.
  */
-data class ChartRow(val signal: RowSignal, val relation: RowRelation = RowRelation.SEPARATE, val speed: SweepSpeed = SweepSpeed.MM_25)
+data class ChartRow(
+    val signal: RowSignal,
+    val relation: RowRelation = RowRelation.SEPARATE,
+    val speed: SweepSpeed = SweepSpeed.MM_25,
+    val span: TrendSpan = TrendSpan.MIN_15,
+    val motion: TrendMotion = TrendMotion.SWEEP,
+)
 
 /**
- * One graph of the chart, [rows] tall, sweeping at [speed]. Graphs in a cascade are one sweep
+ * One graph of the chart, [rows] tall, sweeping at [speed], or for a heart-rate or RR graph across
+ * [span] as [motion] says. Graphs in a cascade are one sweep
  * [cascadeSize] graphs long, folded across them top to bottom, as a bedside monitor cascades its
  * ECG: the trace runs on from each graph into the next and one cursor moves through them all. This
  * graph is number [cascadeIndex] of its cascade, from 0 at the top.
@@ -42,6 +70,8 @@ data class ChartGraph(
     val speed: SweepSpeed = SweepSpeed.MM_25,
     val cascadeIndex: Int = 0,
     val cascadeSize: Int = 1,
+    val span: TrendSpan = TrendSpan.MIN_15,
+    val motion: TrendMotion = TrendMotion.SWEEP,
 )
 
 /**
@@ -52,25 +82,29 @@ data class ChartGraph(
 fun chartGraphs(rows: List<ChartRow>): List<ChartGraph> {
     // Each cascade: its signal, its speed and the heights of its graphs, top to bottom. A graph
     // that is not cascaded is a cascade of one.
-    class Cascade(val signal: RowSignal, val speed: SweepSpeed, val heights: MutableList<Int>)
+    class Cascade(val first: ChartRow, val heights: MutableList<Int>)
     val cascades = mutableListOf<Cascade>()
     for (row in rows) {
-        val above = cascades.lastOrNull()?.takeIf { it.signal == row.signal }
+        val above = cascades.lastOrNull()?.takeIf { it.first.signal == row.signal }
         when {
-            above == null || row.relation == RowRelation.SEPARATE -> cascades += Cascade(row.signal, row.speed, mutableListOf(1))
+            above == null || row.relation == RowRelation.SEPARATE -> cascades += Cascade(row, mutableListOf(1))
             row.relation == RowRelation.JOINED -> above.heights[above.heights.lastIndex]++
             else -> above.heights += 1
         }
     }
     return cascades.flatMap { cascade ->
         cascade.heights.mapIndexed { index, height ->
-            ChartGraph(cascade.signal, height, cascade.speed, cascadeIndex = index, cascadeSize = cascade.heights.size)
+            val first = cascade.first
+            ChartGraph(first.signal, height, first.speed, index, cascade.heights.size, first.span, first.motion)
         }
     }
 }
 
-/** The most sweeps any cascade of [graphs] spans, so the model can keep that much. */
-fun longestCascade(graphs: List<ChartGraph>): Int = graphs.maxOfOrNull { it.cascadeSize } ?: 1
+/**
+ * The most sweeps any waveform cascade of [graphs] spans, so the model can keep that much; heart-rate
+ * and RR graphs draw on the capture's whole history instead.
+ */
+fun longestCascade(graphs: List<ChartGraph>): Int = graphs.filter { !it.signal.trend }.maxOfOrNull { it.cascadeSize } ?: 1
 
 /** The layout 0.3 had: one ECG row above one accelerometer row. */
 val DEFAULT_CHART_ROWS = listOf(ChartRow(RowSignal.ECG), ChartRow(RowSignal.ACC))
@@ -80,11 +114,13 @@ const val MAX_CHART_ROWS = 6
 
 /**
  * The rows as kept in settings, comma separated: each row's signal, after `>` if cascaded or `+`
- * if joined, and after `@` the speed of a separate row, such as `ECG@MM_25,>ECG,ACC@MM_12_5`.
+ * if joined, and after `@` the speed of a separate row, or for a heart-rate or RR row its span and,
+ * after `~`, its motion, such as `ECG@MM_25,>ECG,ACC@MM_12_5,HR@MIN_15~SWEEP`.
  */
 fun encodeChartRows(rows: List<ChartRow>): String = rows.joinToString(",") { row ->
     when (row.relation) {
-        RowRelation.SEPARATE -> "${row.signal.name}@${row.speed.name}"
+        RowRelation.SEPARATE ->
+            if (row.signal.trend) "${row.signal.name}@${row.span.name}~${row.motion.name}" else "${row.signal.name}@${row.speed.name}"
         RowRelation.CASCADED -> ">${row.signal.name}"
         RowRelation.JOINED -> "+${row.signal.name}"
     }
@@ -107,9 +143,12 @@ fun decodeChartRows(text: String, legacySpeed: SweepSpeed = SweepSpeed.MM_25): L
         }
         val body = part.removePrefix("+").removePrefix(">")
         val signal = RowSignal.entries.firstOrNull { it.name == body.substringBefore('@') } ?: return null
-        val speed = if (legacy) legacySpeed else SweepSpeed.entries.firstOrNull { it.name == body.substringAfter('@', "") } ?: legacySpeed
+        val setting = body.substringAfter('@', "")
+        val speed = if (legacy) legacySpeed else SweepSpeed.entries.firstOrNull { it.name == setting } ?: legacySpeed
+        val span = TrendSpan.entries.firstOrNull { it.name == setting.substringBefore('~') } ?: TrendSpan.MIN_15
+        val motion = TrendMotion.entries.firstOrNull { it.name == setting.substringAfter('~', "") } ?: TrendMotion.SWEEP
         previous = signal
-        ChartRow(signal, relation, speed)
+        ChartRow(signal, relation, speed, span, motion)
     }
     return rows.takeIf { it.size in 1..MAX_CHART_ROWS }
 }

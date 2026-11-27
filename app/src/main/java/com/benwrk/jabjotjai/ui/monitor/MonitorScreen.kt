@@ -65,6 +65,7 @@ import com.benwrk.jabjotjai.monitor.MonitorViewModel
 import com.benwrk.jabjotjai.monitor.Playback
 import com.benwrk.jabjotjai.monitor.RowSignal
 import com.benwrk.jabjotjai.monitor.SweepSpeed
+import com.benwrk.jabjotjai.monitor.TrendSnapshot
 import com.benwrk.jabjotjai.monitor.chartGraphs
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.TraceSnapshot
@@ -134,7 +135,9 @@ fun MonitorScreen(
 
     // Every argument is a remembered state object, so one holder serves for as long as the scale holds.
     val scales = mapOf(RowSignal.ECG to ecgScale, RowSignal.ACC to accScale) + axisScales
-    val bands = remember(pxPerMm) { Bands(waves, displayClock, pxPerMm, settings, scales, bandMm) }
+    // Heart-rate and RR rows draw on the capture's own reading, which holds its whole history.
+    val trends = remember { derivedStateOf { live.value.snapshot } }
+    val bands = remember(pxPerMm) { Bands(waves, trends, displayClock, pxPerMm, settings, scales, bandMm) }
     val playheadAtSecond = playback.value.positionNs(secondsClock.value)
     BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background)) {
         val wide = maxWidth >= WIDE_TOP_BAR
@@ -191,6 +194,7 @@ fun MonitorScreen(
 /** What the waveform bands draw from, gathered so the two layouts pass one value. */
 private class Bands(
     val snapshot: State<MonitorSnapshot>,
+    val trends: State<MonitorSnapshot>,
     val frameClock: State<Long>,
     val pxPerMm: Float,
     val settings: State<DisplaySettings>,
@@ -219,6 +223,14 @@ private fun Waveforms(bands: Bands, modifier: Modifier) {
             }
             when (graph.signal) {
                 RowSignal.ECG -> EcgBand(bands, graph, graphModifier)
+                RowSignal.HR -> TrendBand(
+                    stringResource(R.string.monitor_hr_trend, graph.span.minutes), { bands.trends.value.heartRateTrend }, bands, graph,
+                    MonitorColors.Ecg, step = 10, minRange = 40, dots = false, graphModifier,
+                )
+                RowSignal.RR -> TrendBand(
+                    stringResource(R.string.monitor_rr_trend, graph.span.minutes), { bands.trends.value.rrTrend }, bands, graph,
+                    MonitorColors.Text, step = 100, minRange = 400, dots = true, graphModifier,
+                )
                 RowSignal.ACC -> AccBand(bands, ACC_AXES, bands.scales.getValue(RowSignal.ACC), graph, graphModifier)
                 else -> {
                     val axis = ACC_AXES.first { it.signal == graph.signal }
@@ -462,3 +474,26 @@ private fun rememberPxPerMm(): Float {
     val metrics = LocalContext.current.resources.displayMetrics
     return remember(metrics.xdpi, metrics.ydpi) { (metrics.xdpi + metrics.ydpi) / 2f / 25.4f }
 }
+
+/**
+ * A heart-rate or RR graph with its label, given once on a cascade's top graph. A line breaks after
+ * [TREND_JOIN_NS] without a value, as heart rate comes about once a second.
+ */
+@Composable
+private fun TrendBand(
+    label: String,
+    trend: () -> TrendSnapshot,
+    bands: Bands,
+    graph: ChartGraph,
+    color: Color,
+    step: Int,
+    minRange: Int,
+    dots: Boolean,
+    modifier: Modifier,
+) {
+    Band(label = { if (graph.cascadeIndex == 0) Text(label, color = color, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
+        TrendTrace(trend, bands.frameClock, graph, color, step, minRange, dots, maxJoinNs = TREND_JOIN_NS, modifier = Modifier.fillMaxSize())
+    }
+}
+
+private const val TREND_JOIN_NS = 10_000_000_000L

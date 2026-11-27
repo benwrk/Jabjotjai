@@ -35,4 +35,22 @@ class TrendTest {
         assertEquals(listOf(7_000_000_000L, 7_800_000_000L, 8_500_000_000L), rrEndTimes(8_500_000_000L, listOf(900, 800, 700)).toList())
         assertEquals(emptyList<Long>(), rrEndTimes(1, emptyList()).toList())
     }
+
+    @Test
+    fun theScaleCoversWhatIsShownRoundedOutToTheStep() {
+        val series = TrendSeries()
+        listOf(1L to 63, 2L to 71, 3L to 300, 4L to 58).forEach { (t, v) -> series.append(t, v) }
+        series.breakAt(5)
+        // Only the values at 1 and 2: the 300 at 3 and the 58 at 4 come after the window.
+        assertEquals(60 to 80, trendRange(series.snapshot(), fromNs = 0, toNs = 2, step = 10, minRange = 20))
+        assertEquals(null, trendRange(series.snapshot(), fromNs = 10, toNs = 20, step = 10, minRange = 20))
+    }
+
+    @Test
+    fun aSteadyValueStillGetsTheLeastRangeAroundIt() {
+        val series = TrendSeries()
+        series.append(1, 72)
+        series.append(2, 72)
+        assertEquals(50 to 90, trendRange(series.snapshot(), fromNs = 0, toNs = 2, step = 10, minRange = 40))
+    }
 }

@@ -89,4 +89,27 @@ class ChartRowsTest {
         assertNull(decodeChartRows("ECG,PPG"))
         assertNull(decodeChartRows(List(MAX_CHART_ROWS + 1) { "ECG" }.joinToString(",")))
     }
+
+    @Test
+    fun heartRateAndRrRowsKeepTheirSpanAndMotionAndCascadeLikeWaveforms() {
+        val rows = listOf(
+            ChartRow(RowSignal.HR, span = TrendSpan.MIN_60, motion = TrendMotion.SCROLL),
+            ChartRow(RowSignal.HR, CASCADED, span = TrendSpan.MIN_1),
+            ChartRow(RowSignal.RR, span = TrendSpan.MIN_5),
+        )
+        assertEquals(
+            listOf(
+                ChartGraph(RowSignal.HR, 1, MM_25, 0, 2, TrendSpan.MIN_60, TrendMotion.SCROLL),
+                ChartGraph(RowSignal.HR, 1, MM_25, 1, 2, TrendSpan.MIN_60, TrendMotion.SCROLL),
+                ChartGraph(RowSignal.RR, 1, span = TrendSpan.MIN_5),
+            ),
+            chartGraphs(rows),
+        )
+        // Heart-rate and RR graphs draw on the capture's whole history, so they need no waveform sweeps kept.
+        assertEquals(1, longestCascade(chartGraphs(rows)))
+        val text = encodeChartRows(rows)
+        assertEquals("HR@MIN_60~SCROLL,>HR,RR@MIN_5~SWEEP", text)
+        // A cascaded row keeps no span of its own, so it reads back at the default.
+        assertEquals(listOf(rows[0], rows[1].copy(span = TrendSpan.MIN_15), rows[2]), decodeChartRows(text))
+    }
 }

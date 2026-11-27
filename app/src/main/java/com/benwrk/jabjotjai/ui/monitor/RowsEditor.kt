@@ -23,13 +23,16 @@ import com.benwrk.jabjotjai.monitor.MAX_CHART_ROWS
 import com.benwrk.jabjotjai.monitor.RowRelation
 import com.benwrk.jabjotjai.monitor.RowSignal
 import com.benwrk.jabjotjai.monitor.SweepSpeed
+import com.benwrk.jabjotjai.monitor.TrendMotion
+import com.benwrk.jabjotjai.monitor.TrendSpan
 import com.benwrk.jabjotjai.monitor.chartGraphs
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 
 /**
  * The chart's rows, top to bottom: what each shows; below a row of the same signal, whether it is
  * separate from it, cascaded from it or joined to it (see `chartGraphs`); and, where a row starts a
- * graph of its own, its sweep speed. Rows are added at the bottom, showing what the last row shows
+ * graph of its own, its sweep speed, or for a heart-rate or RR row its span and whether it sweeps or
+ * scrolls. Rows are added at the bottom, showing what the last row shows
  * at its speed, and removed from the bottom.
  */
 @Composable
@@ -52,7 +55,22 @@ fun RowsEditor(rows: List<ChartRow>, onChange: (List<ChartRow>) -> Unit) {
                     }
                 }
             }
-            if (!sameAbove || row.relation == RowRelation.SEPARATE) {
+            if ((!sameAbove || row.relation == RowRelation.SEPARATE) && row.signal.trend) {
+                Chips("") {
+                    for (span in TrendSpan.entries) {
+                        FilterChip(
+                            selected = row.span == span,
+                            onClick = { change(row.copy(span = span)) },
+                            label = { Text(stringResource(R.string.display_row_span, span.minutes)) },
+                        )
+                    }
+                }
+                Chips("") {
+                    for (motion in TrendMotion.entries) {
+                        FilterChip(selected = row.motion == motion, onClick = { change(row.copy(motion = motion)) }, label = { Text(stringResource(motion.label)) })
+                    }
+                }
+            } else if (!sameAbove || row.relation == RowRelation.SEPARATE) {
                 Chips("") {
                     for (speed in SweepSpeed.entries) {
                         FilterChip(
@@ -66,7 +84,10 @@ fun RowsEditor(rows: List<ChartRow>, onChange: (List<ChartRow>) -> Unit) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(
-                onClick = { onChange(rows + ChartRow(rows.last().signal, speed = chartGraphs(rows).last().speed)) },
+                onClick = {
+                    val last = chartGraphs(rows).last()
+                    onChange(rows + ChartRow(last.signal, speed = last.speed, span = last.span, motion = last.motion))
+                },
                 enabled = rows.size < MAX_CHART_ROWS,
             ) { Text(stringResource(R.string.display_row_add)) }
             TextButton(onClick = { onChange(rows.dropLast(1)) }, enabled = rows.size > 1) {
@@ -94,6 +115,14 @@ private val RowSignal.label: Int
         RowSignal.ACC_X -> R.string.signal_acc_x
         RowSignal.ACC_Y -> R.string.signal_acc_y
         RowSignal.ACC_Z -> R.string.signal_acc_z
+        RowSignal.HR -> R.string.signal_hr
+        RowSignal.RR -> R.string.signal_rr
+    }
+
+private val TrendMotion.label: Int
+    get() = when (this) {
+        TrendMotion.SWEEP -> R.string.display_row_sweep
+        TrendMotion.SCROLL -> R.string.display_row_scroll
     }
 
 private val RowRelation.label: Int
