@@ -66,9 +66,25 @@ class ChartRowsTest {
     fun rowsAreKeptAsTextAndReadBack() {
         val rows = listOf(ChartRow(ECG, speed = MM_12_5), ChartRow(ECG, JOINED), ChartRow(ECG, CASCADED), ChartRow(ACC_X, speed = MM_6_25))
         val text = encodeChartRows(rows)
-        assertEquals("ECG@MM_12_5,+ECG,>ECG,ACC_X@MM_6_25", text)
-        // A joined or cascaded row keeps no speed of its own, so it reads back at the default.
-        assertEquals(listOf(rows[0], rows[1].copy(speed = MM_25), rows[2].copy(speed = MM_25), rows[3]), decodeChartRows(text))
+        // Every row keeps its own speed, a joined or cascaded one too. Until this was kept, such a
+        // row read back at the default speed, which showed below a row of another signal, where
+        // its own speed is the one drawn.
+        assertEquals("ECG@MM_12_5,+ECG@MM_25,>ECG@MM_25,ACC_X@MM_6_25", text)
+        assertEquals(rows, decodeChartRows(text))
+    }
+
+    @Test
+    fun aRowBelowAnotherSignalKeepsItsOwnSpeedAcrossARestart() {
+        val rows = listOf(ChartRow(ECG), ChartRow(ACC_X, JOINED, MM_6_25), ChartRow(ECG, CASCADED, MM_12_5))
+        val readBack = requireNotNull(decodeChartRows(encodeChartRows(rows)))
+        assertEquals(rows, readBack)
+        assertEquals(chartGraphs(rows), chartGraphs(readBack))
+    }
+
+    @Test
+    fun aJoinedOrCascadedRowKeptWithoutItsSpeedStillReadsAtTheDefault() {
+        // As 0.5 and 0.6 kept it.
+        assertEquals(listOf(ChartRow(ECG, speed = MM_12_5), ChartRow(ECG, CASCADED, MM_25)), decodeChartRows("ECG@MM_12_5,>ECG"))
     }
 
     @Test
@@ -108,8 +124,8 @@ class ChartRowsTest {
         // Heart-rate and RR graphs draw on the capture's whole history, so they need no waveform sweeps kept.
         assertEquals(1, longestCascade(chartGraphs(rows)))
         val text = encodeChartRows(rows)
-        assertEquals("HR@MIN_60~SCROLL,>HR,RR@MIN_5~SWEEP", text)
-        // A cascaded row keeps no span of its own, so it reads back at the default.
-        assertEquals(listOf(rows[0], rows[1].copy(span = TrendSpan.MIN_15), rows[2]), decodeChartRows(text))
+        // A cascaded row keeps its own span and motion, as a waveform row keeps its speed.
+        assertEquals("HR@MIN_60~SCROLL,>HR@MIN_1~SWEEP,RR@MIN_5~SWEEP", text)
+        assertEquals(rows, decodeChartRows(text))
     }
 }

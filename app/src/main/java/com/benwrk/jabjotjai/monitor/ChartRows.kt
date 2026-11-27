@@ -114,16 +114,19 @@ const val MAX_CHART_ROWS = 6
 
 /**
  * The rows as kept in settings, comma separated: each row's signal, after `>` if cascaded or `+`
- * if joined, and after `@` the speed of a separate row, or for a heart-rate or RR row its span and,
- * after `~`, its motion, such as `ECG@MM_25,>ECG,ACC@MM_12_5,HR@MIN_15~SWEEP`.
+ * if joined, and after `@` its speed, or for a heart-rate or RR row its span and, after `~`, its
+ * motion, such as `ECG@MM_25,>ECG@MM_25,ACC@MM_12_5,HR@MIN_15~SWEEP`. A cascaded or joined row keeps
+ * its own setting too, because below a row of another signal it starts a graph of its own at that
+ * setting (see [chartGraphs]).
  */
 fun encodeChartRows(rows: List<ChartRow>): String = rows.joinToString(",") { row ->
-    when (row.relation) {
-        RowRelation.SEPARATE ->
-            if (row.signal.trend) "${row.signal.name}@${row.span.name}~${row.motion.name}" else "${row.signal.name}@${row.speed.name}"
-        RowRelation.CASCADED -> ">${row.signal.name}"
-        RowRelation.JOINED -> "+${row.signal.name}"
+    val relation = when (row.relation) {
+        RowRelation.SEPARATE -> ""
+        RowRelation.CASCADED -> ">"
+        RowRelation.JOINED -> "+"
     }
+    val setting = if (row.signal.trend) "${row.span.name}~${row.motion.name}" else row.speed.name
+    "$relation${row.signal.name}@$setting"
 }
 
 /**

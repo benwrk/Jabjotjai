@@ -258,9 +258,6 @@ Done when each follows its source while the monitor is open, tried on the test p
 
 Found by reading, not yet tried on the phone:
 
-- A cascaded or joined row below a row of another signal is stored as `>ECG` without its speed
-  (`encodeChartRows`), yet it starts a graph of its own at its own speed, so after a restart it
-  comes back at the old default speed, span and motion.
 - The gap count shown in the past depends on how the playhead got there: playing from an earlier
   file into the current one adds the two files' counts, while jumping straight into the current
   one shows only its own.
