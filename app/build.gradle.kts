@@ -7,7 +7,7 @@ plugins {
 // The app's semantic version. Android refuses to install a lower versionCode over a higher one
 // (developer.android.com/studio/publish/versioning), so versionCode is derived from the version
 // rather than maintained by hand, and grows whenever the version does.
-val appVersion = "0.2.0"
+val appVersion = "0.3.0"
 val appVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) ->
     require(minor < 1000 && patch < 1000) { "minor and patch must stay below 1000: $appVersion" }
     major * 1_000_000 + minor * 1_000 + patch
