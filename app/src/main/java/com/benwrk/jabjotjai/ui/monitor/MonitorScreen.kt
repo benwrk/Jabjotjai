@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -59,18 +60,19 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.capture.Capture
 import com.benwrk.jabjotjai.capture.CaptureState
-import com.benwrk.jabjotjai.capture.LiveReading
 import com.benwrk.jabjotjai.monitor.AutoScale
 import com.benwrk.jabjotjai.monitor.BandScale
 import com.benwrk.jabjotjai.monitor.DisplaySettings
 import com.benwrk.jabjotjai.monitor.HeartRate
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
+import com.benwrk.jabjotjai.monitor.Playback
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.TraceSnapshot
 import com.benwrk.jabjotjai.monitor.currentHeartRate
 import com.benwrk.jabjotjai.monitor.elapsedSeconds
 import com.benwrk.jabjotjai.monitor.elapsedText
+import com.benwrk.jabjotjai.monitor.positionNs
 import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import kotlinx.coroutines.delay
@@ -95,8 +97,10 @@ fun MonitorScreen(
 ) {
     KeepScreenOn()
     ReportMonitorVisible()
-    val snapshot = viewModel.snapshot.collectAsState()
+    val liveWaves = viewModel.snapshot.collectAsState()
     val live = viewModel.live.collectAsState()
+    val replay = viewModel.replay.collectAsState()
+    val playback = viewModel.playback.collectAsState()
     val readError by viewModel.readError.collectAsState()
     val beepError by Capture.beepError.collectAsState()
     val settings = viewModel.displaySettings.collectAsState()
@@ -105,18 +109,25 @@ fun MonitorScreen(
     val secondsClock = rememberSecondsClock()
     val pxPerMm = rememberPxPerMm()
 
+    // What is drawn follows the playhead: the live readers at live, the past reader otherwise.
+    // derivedStateOf makes these states that change only when their source does.
+    val displayClock = remember { derivedStateOf { playback.value.positionNs(frameClock.value) } }
+    val waves = remember { derivedStateOf { if (playback.value is Playback.Live) liveWaves.value else replay.value } }
+    val vitals = remember { derivedStateOf { if (playback.value is Playback.Live) live.value.snapshot else replay.value } }
+
     val ecgBandMm = remember { mutableFloatStateOf(0f) }
     val accBandMm = remember { mutableFloatStateOf(0f) }
-    val ecgScale = rememberBandScale(snapshot, ScaleLadder.ECG, settings.value.ecgAuto, settings.value.ecgGainIndex, ecgBandMm) {
+    val ecgScale = rememberBandScale(waves, ScaleLadder.ECG, settings.value.ecgAuto, settings.value.ecgGainIndex, ecgBandMm) {
         listOf(it.ecg)
     }
-    val accScale = rememberBandScale(snapshot, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, accBandMm) {
+    val accScale = rememberBandScale(waves, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, accBandMm) {
         listOf(it.accX, it.accY, it.accZ)
     }
     var showDisplaySheet by rememberSaveable { mutableStateOf(false) }
 
     // Every argument is a remembered state object, so one holder serves for as long as the scale holds.
-    val bands = remember(pxPerMm) { Bands(snapshot, frameClock, pxPerMm, settings, ecgScale, accScale, ecgBandMm, accBandMm) }
+    val bands = remember(pxPerMm) { Bands(waves, displayClock, pxPerMm, settings, ecgScale, accScale, ecgBandMm, accBandMm) }
+    val playheadAtSecond = playback.value.positionNs(secondsClock.value)
     BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background)) {
         val landscape = maxWidth > maxHeight
         val numericsWidth = maxWidth * 0.26f
@@ -130,14 +141,24 @@ fun MonitorScreen(
                 )
             }
             if (landscape) {
-                Row(Modifier.fillMaxSize()) {
+                Row(Modifier.weight(1f).fillMaxWidth()) {
                     Waveforms(bands, Modifier.weight(1f).fillMaxHeight())
-                    Numerics(live, frameClock, secondsClock.value, beepError, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
+                    Numerics(vitals, displayClock, playheadAtSecond, beepError, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
                 }
             } else {
-                Numerics(live, frameClock, secondsClock.value, beepError, vertical = false, Modifier.fillMaxWidth())
+                Numerics(vitals, displayClock, playheadAtSecond, beepError, vertical = false, Modifier.fillMaxWidth())
                 Waveforms(bands, Modifier.weight(1f).fillMaxWidth())
             }
+            PlaybackBar(
+                playback = playback.value,
+                startNs = live.value.snapshot.header?.start?.monoNs,
+                nowNs = secondsClock.value,
+                onTogglePause = viewModel::togglePause,
+                onSeek = viewModel::seek,
+                onSpeed = viewModel::setSpeed,
+                onLive = viewModel::goLive,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 
@@ -328,19 +349,22 @@ private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
     }
 }
 
-/** Heart rate, contact, battery and gaps, all from [Capture.live]: read from the file's first line. */
+/**
+ * Heart rate, contact, battery and gaps at the playhead: from [Capture.live] at live, read from the
+ * file's first line, and from the past reader otherwise. [nowMonoNs] is the playhead, for staleness.
+ */
 @Composable
 private fun Numerics(
-    live: State<LiveReading>,
+    vitals: State<MonitorSnapshot>,
     frameClock: State<Long>,
     nowMonoNs: Long,
     beepError: String?,
     vertical: Boolean,
     modifier: Modifier,
 ) {
-    val snapshot = live.value.snapshot
+    val snapshot = vitals.value
     val heartRate = snapshot.currentHeartRate(nowMonoNs)
-    val beats = { live.value.snapshot.beats }
+    val beats = { vitals.value.beats }
     if (vertical) {
         Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             HeartRateNumeric(heartRate, beats, frameClock)

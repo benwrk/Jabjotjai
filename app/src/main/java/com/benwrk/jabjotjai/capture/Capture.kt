@@ -1,6 +1,7 @@
 package com.benwrk.jabjotjai.capture
 
 import android.content.Context
+import com.benwrk.jabjotjai.monitor.CaptureTimeline
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +24,7 @@ sealed interface CaptureState {
  *
  * @param readError why the reader stopped, if the raw file could not be read
  */
-data class LiveReading(val snapshot: MonitorSnapshot, val readError: String?) {
+data class LiveReading(val snapshot: MonitorSnapshot, val readError: String?, val timeline: CaptureTimeline? = null) {
     companion object {
         val EMPTY = LiveReading(MonitorSnapshot.EMPTY, readError = null)
     }
@@ -49,6 +50,15 @@ object Capture {
     /** Whether the monitor is on screen, which the beat beep follows unless it is set to keep going. */
     val monitorVisible: StateFlow<Boolean> = mutableMonitorVisible.asStateFlow()
 
+    private val mutableReplayBeats = MutableStateFlow<List<Long>?>(null)
+
+    /**
+     * While the monitor shows the past, the beats it is playing, already moved onto the real clock
+     * at the playing speed, for the beep to sound; empty while that should be silent; null at live,
+     * when the beep follows [live].
+     */
+    val replayBeats: StateFlow<List<Long>?> = mutableReplayBeats.asStateFlow()
+
     private val mutableBeepError = MutableStateFlow<String?>(null)
 
     /** Why the beat beep cannot sound, or null if nothing is stopping it. */
@@ -64,6 +74,10 @@ object Capture {
 
     internal fun publishBeepError(message: String?) {
         mutableBeepError.value = message
+    }
+
+    fun setReplayBeats(beats: List<Long>?) {
+        mutableReplayBeats.value = beats
     }
 
     fun setMonitorVisible(visible: Boolean) {

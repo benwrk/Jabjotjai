@@ -98,6 +98,16 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
         this.header = header
     }
 
+    /**
+     * For a reader that starts part-way through the file: the connection, battery and gap count
+     * as they stood there, from what was read before it (see [CaptureTimeline]).
+     */
+    fun startFrom(state: CaptureStateAt) {
+        connection = state.connection
+        batteryPct = state.batteryPct
+        gaps = state.gaps
+    }
+
     fun accept(line: RawLine) {
         when (line) {
             is RawLine.Unknown -> unknownLines++

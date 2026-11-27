@@ -37,6 +37,12 @@
     <string name="monitor_read_error">Cannot read the raw file: %1$s</string>
     <string name="monitor_beep_unavailable">No beep: %1$s</string>
 
+    <string name="playback_live">LIVE</string>
+    <string name="playback_behind">−%1$s</string>
+    <string name="playback_speed">%1$s×</string>
+    <string name="playback_play">Play</string>
+    <string name="playback_pause">Pause</string>
+
     <string name="display_open">Display</string>
     <string name="display_title">Display</string>
     <string name="display_sweep">Sweep speed, mm/s</string>

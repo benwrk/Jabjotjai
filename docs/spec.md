@@ -13,7 +13,9 @@ that hold for every version are in `AGENTS.md`; the raw file format is in `docs/
 
 ## 0.1: live monitor
 
-The current scope. Nothing beyond it is built until it works on a real phone with a real strap.
+Built and seen working on the test phone, except one thing: staying connected through 30 minutes
+on battery with the screen off (item 4), which is in `docs/backlog.md`. The owner chose to go on to
+0.2 before that test.
 
 1. **Connect to a Polar H10** that the user picks from a scan of nearby straps.
 2. **Show live, in the style of a bedside patient monitor:**
@@ -56,12 +58,31 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
 5. **The layout adapts to orientation.** Landscape is the monitor layout, with waveforms on the
    left and numerics on the right; portrait stacks the numerics above the waveforms.
 
+## 0.2: rewinding the running capture
+
+The current scope: the monitor can go back through the capture that is running, the way a live
+video stream can be rewound.
+
+1. **A timeline under the monitor** runs from the capture's start to now. Releasing it after a
+   drag moves the playhead to that moment; within a second of now counts as live. A LIVE button,
+   lit at live, goes back to live.
+2. **Play, pause and speed.** Pausing at live holds that moment. Speeds are 0.5×, 1×, 2×, 4× and
+   8×; faster than 1× is offered only in the past and becomes live once it catches up, and slower
+   than 1× at live falls behind it.
+3. **The monitor shows the playhead's moment**: waveforms, heart rate, heart flash, contact,
+   battery and gaps, as they were then. The beep follows it up to 2× and is silent faster than
+   that or while paused. The status bar and the notification always show the capture as it is now.
+4. **The past is read from the raw file**, like the live view: starting a little before the
+   playhead, at a point the capture's own reader noted while reading the file from its first line,
+   and never further than the playhead has reached, so the screen holds exactly what had been
+   received by then.
+
 ## Later
 
 Not scheduled. Each becomes a version when it is specified:
 
 - recording sessions, and getting files off the phone;
-- a viewer;
+- a viewer for finished captures;
 - detectors, as derived overlays. The monitor's beat beep and heart flash then follow the R-peak
   detector instead of the strap's reported beats (decision `0009`);
 - live sharing;

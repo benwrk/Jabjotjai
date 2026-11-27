@@ -16,10 +16,13 @@ import android.os.PowerManager
 import android.util.Log
 import com.benwrk.jabjotjai.MainActivity
 import com.benwrk.jabjotjai.R
+import com.benwrk.jabjotjai.monitor.CaptureStateAt
+import com.benwrk.jabjotjai.monitor.CaptureTimeline
 import com.benwrk.jabjotjai.monitor.DisplaySettingsStore
 import com.benwrk.jabjotjai.monitor.MonitorModel
 import com.benwrk.jabjotjai.monitor.beepAtBeats
 import com.benwrk.jabjotjai.monitor.elapsedText
+import com.benwrk.jabjotjai.monitor.timeMonoNs
 import com.benwrk.jabjotjai.raw.AccRecord
 import com.benwrk.jabjotjai.raw.EcgRecord
 import com.benwrk.jabjotjai.raw.HeaderRecord
@@ -228,18 +231,26 @@ class CaptureService : Service() {
      */
     private suspend fun readLive(file: File) {
         val model = MonitorModel(keepNs = 0)
-        Capture.publishLive(LiveReading.EMPTY)
+        // Mapped as it is read, so the monitor can jump back to any moment (see CaptureTimeline).
+        val timeline = CaptureTimeline()
+        Capture.publishLive(LiveReading.EMPTY.copy(timeline = timeline))
         try {
-            RawTail(file, pollIntervalMs = LIVE_TAIL_POLL_MS).lines().collect { line ->
+            RawTail(file, pollIntervalMs = LIVE_TAIL_POLL_MS).linesWithOffsets().collect { (offset, line) ->
                 model.accept(line)
-                val record = (line as? RawLine.Record)?.record
-                if (record !is EcgRecord && record !is AccRecord) Capture.publishLive(LiveReading(model.snapshot(), readError = null))
+                val record = (line as? RawLine.Record)?.record ?: return@collect
+                val time = record.timeMonoNs()
+                timeline.addLine(offset, time)
+                if (record !is EcgRecord && record !is AccRecord) {
+                    val snapshot = model.snapshot()
+                    timeline.addState(time, CaptureStateAt(snapshot.connection, snapshot.batteryPct, snapshot.gaps))
+                    Capture.publishLive(LiveReading(snapshot, readError = null, timeline = timeline))
+                }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "cannot read the raw file", e)
-            Capture.publishLive(LiveReading(model.snapshot(), readError = e.message ?: e.toString()))
+            Capture.publishLive(LiveReading(model.snapshot(), readError = e.message ?: e.toString(), timeline = timeline))
         }
     }
 
@@ -278,7 +289,7 @@ class CaptureService : Service() {
             Capture.publishBeepError(null)
             if (!wanted) return@collectLatest
             try {
-                withContext(Dispatchers.IO) { beepAtBeats { Capture.live.value.snapshot.beats } }
+                withContext(Dispatchers.IO) { beepAtBeats { Capture.replayBeats.value ?: Capture.live.value.snapshot.beats } }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
