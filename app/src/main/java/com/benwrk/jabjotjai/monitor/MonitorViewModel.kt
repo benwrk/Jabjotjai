@@ -109,6 +109,33 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         replayStart.value++
     }
 
+    /** The playback before the current drag began, or null when not dragging. */
+    private var beforeScrub: Playback? = null
+
+    /**
+     * Shows [targetNs] while the timeline is being dragged: paused there, read with only a short
+     * lead ([SCRUB_LEAD_NS]) so each step is quick. Each step starts the past reader again, which
+     * cancels the read of the step before, so a fast drag never queues reads up.
+     */
+    fun scrub(targetNs: Long) {
+        val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
+        val before = beforeScrub ?: mutablePlayback.value.also { beforeScrub = it }
+        val now = nowNs()
+        mutablePlayback.value = Playback.Past(targetNs.coerceIn(start, now), now, before.speed, paused = true)
+        replayStart.value++
+    }
+
+    /** Ends a drag at [targetNs]: jumps there and plays or stays paused as before the drag began. */
+    fun endScrub(targetNs: Long) {
+        val before = beforeScrub ?: mutablePlayback.value
+        beforeScrub = null
+        val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
+        val now = nowNs()
+        val base = if (before is Playback.Live) before else Playback.Past(targetNs, now, before.speed, before.paused)
+        mutablePlayback.value = base.seek(targetNs, start, now)
+        replayStart.value++
+    }
+
     fun setSpeed(speed: Float) {
         val before = mutablePlayback.value
         mutablePlayback.value = before.withSpeed(speed, nowNs())
@@ -150,7 +177,8 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         val live = Capture.live.value
         val timeline = live.timeline ?: return
         val header = live.snapshot.header ?: return
-        val from = mutablePlayback.value.positionNs(nowNs()) - REPLAY_LEAD_NS
+        val lead = if (beforeScrub != null) SCRUB_LEAD_NS else REPLAY_LEAD_NS
+        val from = mutablePlayback.value.positionNs(nowNs()) - lead
         val mark = timeline.markAtOrBefore(from)
         val model = MonitorModel()
         model.setHeader(header)
@@ -203,6 +231,9 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
         /** How far before the playhead the past reader starts: what the model keeps, so a sweep fills. */
         const val REPLAY_LEAD_NS = MonitorModel.DEFAULT_KEEP_NS
+
+        /** While dragging: about one sweep across a phone at the slower speeds, so each step reads little. */
+        const val SCRUB_LEAD_NS = 10_000_000_000L
 
         const val MAX_WAIT_MS = 50L
         const val CATCH_UP_CHECK_MS = 200L

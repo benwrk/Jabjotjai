@@ -38,8 +38,8 @@ import com.benwrk.jabjotjai.ui.theme.MonitorColors
 /**
  * The capture's timeline, like a live video stream's: the bar runs from the capture's start to
  * now. At live the time is the capture's length and LIVE is lit; in the past the time is how far
- * behind live the playhead is, and tapping LIVE goes back. The slider moves the playhead when
- * released, not while dragged, since each jump starts reading the file again.
+ * behind live the playhead is, and tapping LIVE goes back. Dragging the slider shows the moment
+ * under the finger, paused; letting go jumps there and plays on as before the drag.
  *
  * @param startNs the capture's start, or null until its header has been read
  */
@@ -49,6 +49,7 @@ fun PlaybackBar(
     startNs: Long?,
     nowNs: Long,
     onTogglePause: () -> Unit,
+    onScrub: (Long) -> Unit,
     onSeek: (Long) -> Unit,
     onSpeed: (Float) -> Unit,
     onLive: () -> Unit,
@@ -85,7 +86,10 @@ fun PlaybackBar(
         )
         Slider(
             value = fraction,
-            onValueChange = { dragging = it },
+            onValueChange = {
+                dragging = it
+                if (startNs != null) onScrub(startNs + (it * lengthNs).toLong())
+            },
             onValueChangeFinished = {
                 val target = dragging
                 dragging = null

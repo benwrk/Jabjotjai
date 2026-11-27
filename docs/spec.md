@@ -96,6 +96,9 @@ cannot end itself properly; it is noted and resumed afterwards instead.
    to the same strap without a scan. The time between the two files is a gap, never stitched
    across.
 5. **Swiping the app away from recent apps does not stop a capture.**
+6. **Scrubbing the timeline** (also in 0.3): while the timeline is dragged, the monitor shows the
+   moment under the finger, paused; letting go moves the playhead there and plays on, or stays
+   paused, as before the drag.
 
 ## Later
 
