@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -105,7 +106,9 @@ fun PlaybackBar(
                 },
                 enabled = startNs != null,
                 active = dragging != null,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                // The line reaches the screen's edges, where a swipe in is Android's back gesture; grabbing the
+                // knob at live there closed the monitor instead of dragging it.
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).systemGestureExclusion(),
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 JumpButton(R.drawable.ic_jump_back, stringResource(R.string.playback_jump_back, JUMP_SECONDS), enabled = startNs != null) { onJump(-JUMP_NS) }
