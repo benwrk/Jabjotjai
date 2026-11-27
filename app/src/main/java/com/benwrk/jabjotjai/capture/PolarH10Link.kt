@@ -47,7 +47,13 @@ class PolarH10Link(
     private val scope: CoroutineScope,
 ) {
 
-    private val streams = HashMap<String, Job>()
+    /** A stream's collection, and the connection it was started on. */
+    private class RunningStream(val connection: Int, val job: Job)
+
+    private val streams = HashMap<String, RunningStream>()
+
+    /** Counts the strap's connections, so a stream started on an earlier one is known to be stale. */
+    private var connection = 0
     private var stopped = false
 
     fun connect() {
@@ -59,7 +65,7 @@ class PolarH10Link(
     suspend fun stop(reason: String) {
         if (stopped) return
         stopped = true
-        streams.values.forEach { it.cancelAndJoin() }
+        streams.values.forEach { it.job.cancelAndJoin() }
         streams.clear()
         api.setApiCallback(SilentCallback)
         try {
@@ -98,7 +104,11 @@ class PolarH10Link(
         }
 
         override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
-            if (isThisStrap(polarDeviceInfo)) onCaptureThread { session.event(event(it, RawEvents.CONNECTED)) }
+            if (!isThisStrap(polarDeviceInfo)) return
+            onCaptureThread {
+                connection++
+                session.event(event(it, RawEvents.CONNECTED))
+            }
         }
 
         // The SDK calls both disconnect overloads, one after the other (BDBleApiImpl, SDK 9.0.0,
@@ -106,6 +116,10 @@ class PolarH10Link(
         override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo, info: PolarBleDisconnectInfo) {
             if (!isThisStrap(polarDeviceInfo)) return
             onCaptureThread {
+                // Cancelled now, while nothing is connected, so cancelling cannot switch off what
+                // the next connection's streams switch on (see [startStream]).
+                streams.values.forEach { running -> running.job.cancel() }
+                streams.clear()
                 session.disconnected(
                     event(it, RawEvents.DISCONNECTED).copy(
                         reason = info.reason.name,
@@ -149,12 +163,22 @@ class PolarH10Link(
     }
 
     /**
-     * (Re)starts one stream. A feature becomes ready again after every reconnect, so any earlier
-     * collection of the same stream is cancelled first.
+     * Starts one stream, at most once per connection.
+     *
+     * The SDK reports a feature ready more than once on a single connection: `FEATURE_HR` three
+     * times and `FEATURE_POLAR_ONLINE_STREAMING` twice, in each of three captures on the test strap
+     * (SDK 9.0.0, 2026-11-27). Restarting the stream on each report lost heart rate for a whole
+     * capture: logcat showed the Heart Rate Measurement characteristic's notifications switched on
+     * four times and then off, last, and no heart rate arrived afterwards. In a capture where they
+     * ended switched on, heart rate arrived. Why cancelling a collection switches them off after
+     * the new one switched them on is not confirmed. So a stream already running on this connection
+     * is left alone; one left from an earlier connection is replaced.
      */
     private fun startStream(stream: String) {
-        streams.remove(stream)?.cancel()
-        streams[stream] = scope.launch {
+        val running = streams[stream]
+        if (running != null && running.connection == connection && running.job.isActive) return
+        running?.job?.cancel()
+        streams[stream] = RunningStream(connection, scope.launch {
             try {
                 when (stream) {
                     RawStreams.ECG -> streamEcg()
@@ -167,7 +191,7 @@ class PolarH10Link(
             } catch (e: Exception) {
                 if (!stopped) session.streamError(streamError(stream, e.toString()))
             }
-        }
+        })
     }
 
     private fun streamError(stream: String, message: String) =

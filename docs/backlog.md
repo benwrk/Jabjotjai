@@ -49,6 +49,16 @@ different fix.
 The 1 mV pulse at the left edge is drawn over "ECG · 1 mV · 25 mm/s" (seen 2026-11-27). Done when
 neither covers the other in either orientation.
 
+## Record a stream that goes silent while the strap is connected
+
+A stream that is started but never delivers leaves nothing in the file but its `stream_started`
+event: a gap is only opened for a stream that has delivered before, and only on a disconnection
+or a stream error. On 2026-11-27 a capture had no heart rate at all for that reason (the stream's
+notifications ended switched off; see `PolarH10Link.startStream`), and only the empty numeric
+showed it. Done when a stream that has started, or has delivered, and then sends nothing for a
+set time while connected is recorded as such in the raw file, with the time chosen from each
+stream's measured frame interval, and a test shows the record being written.
+
 ## Confirm the agent conventions in a fresh Claude Code session
 
 Two mechanisms can only fire at session start or once per session, so neither has been observed
