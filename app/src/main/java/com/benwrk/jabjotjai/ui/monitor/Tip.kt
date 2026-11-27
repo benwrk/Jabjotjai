@@ -47,7 +47,7 @@ fun WithTip(
     var shown by remember { mutableStateOf(false) }
     Box(
         modifier
-            .combinedClickable(onClickLabel = tip, onLongClick = { shown = true }) { if (onClick != null) onClick() else shown = !shown }
+            .combinedClickable(onLongClick = { shown = true }) { if (onClick != null) onClick() else shown = !shown }
             .semantics { contentDescription = tip },
     ) {
         content()

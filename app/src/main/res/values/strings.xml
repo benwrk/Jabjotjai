@@ -61,7 +61,7 @@
     <string name="tip_heart">Flashes at each beat the strap reports</string>
     <string name="monitor_percent">%1$d%%</string>
     <string name="monitor_stop_title">Stop the capture?</string>
-    <string name="monitor_stop_body">The strap is disconnected and this capture\'s file is closed. Capturing again starts a new file.</string>
+    <string name="monitor_stop_body">The strap will be disconnected and this capture will be closed. Capturing again will start a new file.</string>
     <string name="monitor_stop_keep">Keep capturing</string>
     <string name="monitor_stop_tip">Stop the capture</string>
 
