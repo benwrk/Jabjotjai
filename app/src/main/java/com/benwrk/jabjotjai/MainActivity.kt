@@ -22,15 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.benwrk.jabjotjai.capture.Capture
-import com.benwrk.jabjotjai.capture.CaptureState
 import com.benwrk.jabjotjai.capture.CaptureRecovery
+import com.benwrk.jabjotjai.capture.CaptureState
+import com.benwrk.jabjotjai.capture.Recovery
 import com.benwrk.jabjotjai.capture.RunningCaptureStore
-import com.benwrk.jabjotjai.capture.UncleanEnd
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
 import com.benwrk.jabjotjai.ui.BluetoothPermissionGate
 import com.benwrk.jabjotjai.ui.monitor.MonitorScreen
 import com.benwrk.jabjotjai.ui.monitor.StopQuestion
 import com.benwrk.jabjotjai.ui.picker.DevicePickerScreen
+import com.benwrk.jabjotjai.ui.picker.RecoveryFailure
 import com.benwrk.jabjotjai.ui.picker.ResumeOffer
 import com.benwrk.jabjotjai.ui.picker.ScanViewModel
 import com.benwrk.jabjotjai.ui.theme.JabjotjaiTheme
@@ -94,23 +95,33 @@ private fun App(scanViewModel: ScanViewModel, monitorViewModel: MonitorViewModel
                         onStop = { Capture.stop(context) },
                     )
                     else -> Column {
-                        // A capture the app did not end, which nothing resumed by itself: offer it.
-                        var unclean by remember { mutableStateOf<UncleanEnd?>(null) }
-                        LaunchedEffect(Unit) { unclean = withContext(Dispatchers.IO) { CaptureRecovery.find(context) } }
-                        unclean?.let { stopped ->
-                            ResumeOffer(
-                                unclean = stopped,
+                        // A capture the app did not end, which nothing resumed by itself: offer it,
+                        // or say that whether it ended could not be told.
+                        var recovery by remember { mutableStateOf<Recovery>(Recovery.None) }
+                        LaunchedEffect(Unit) { recovery = withContext(Dispatchers.IO) { CaptureRecovery.find(context) } }
+                        when (val found = recovery) {
+                            is Recovery.Found -> ResumeOffer(
+                                unclean = found.unclean,
                                 onResume = {
-                                    unclean = null
+                                    recovery = Recovery.None
                                     scanViewModel.stopScan()
-                                    Capture.resume(context, stopped.capture)
+                                    Capture.resume(context, found.unclean.capture)
                                 },
                                 onDismiss = {
-                                    unclean = null
+                                    recovery = Recovery.None
                                     RunningCaptureStore.clear(context)
                                 },
                                 modifier = Modifier.padding(24.dp),
                             )
+                            is Recovery.Failed -> RecoveryFailure(
+                                message = found.message,
+                                onDismiss = {
+                                    recovery = Recovery.None
+                                    RunningCaptureStore.clear(context)
+                                },
+                                modifier = Modifier.padding(24.dp),
+                            )
+                            Recovery.None -> Unit
                         }
                         DevicePickerScreen(
                             viewModel = scanViewModel,

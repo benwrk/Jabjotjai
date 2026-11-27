@@ -51,3 +51,16 @@ fun ResumeOffer(unclean: UncleanEnd, onResume: () -> Unit, onDismiss: () -> Unit
         }
     }
 }
+
+/**
+ * Says that whether the last capture ended could not be told, with [message] saying why. Dismissing
+ * forgets that capture, as dismissing the offer to resume does; until then each opening looks again.
+ */
+@Composable
+fun RecoveryFailure(message: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.recovery_failed_title), style = MaterialTheme.typography.titleMedium, color = MonitorColors.Warning)
+        Text(stringResource(R.string.recovery_failed_body, message), color = MonitorColors.Text)
+        TextButton(onClick = onDismiss) { Text(stringResource(R.string.resume_dismiss)) }
+    }
+}

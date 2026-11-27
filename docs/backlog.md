@@ -35,19 +35,14 @@ followed, on the same connection, by `stream_started` and that stream's frames, 
 if the frames do not come, record what logcat shows. A stream that goes silent without an error
 is the entry "Record a stream that goes silent" below.
 
-## Handle a full disk and a failed write
+## Warn before the disk fills
 
-- `CaptureRecovery.find` writes the ending note and reads the file without catching a failure,
-  so with the disk full the picker's call would throw, likely on every opening of the app (not
-  tried).
-- `CaptureRecovery.lastLines` decodes with `RawCodec.decode`, not the decoder the header's schema
-  names (decision `0006`); decoding by the header can fail on a header that cannot be read, which
-  is why it waits for recovery to report failures.
-- Nothing checks free space before or during a capture.
-
-A write that fails part-way now has its fragment ended before the next record (`RawWriter`).
-Done when recovery reports a failure instead of throwing and decodes by the header's schema, and
-the app warns before starting with little space and during a capture when space runs low.
+Nothing checks free space before or during a capture. A full disk now fails the capture loudly:
+the failed write's fragment is ended before the next record (`RawWriter`), and recovery reports
+what it could not read or write instead of throwing (`CaptureRecovery.inspect`). An hour of
+capture takes about 36 MB on the test phone (a 36 MB recording of about an hour, 2026-11-27).
+Done when the app warns before starting with too little space for a night, and during a capture
+when space runs low, with the thresholds chosen by the owner.
 
 ## Say what the stored times measure
 

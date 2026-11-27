@@ -124,9 +124,10 @@ class CaptureService : Service() {
     }
 
     private fun resumeAfterRestart(startId: Int) {
-        val unclean = CaptureRecovery.find(this)
+        val unclean = (CaptureRecovery.find(this) as? Recovery.Found)?.unclean
         if (unclean == null || !unclean.resumesByItself) {
-            // Nothing to resume, or something the user is asked about when they next open the app.
+            // Nothing to resume, or something the user is asked about, or told could not be
+            // checked, when they next open the app.
             stopSelf(startId)
             return
         }

@@ -9,13 +9,18 @@ import com.benwrk.jabjotjai.raw.EcgRecord
 import com.benwrk.jabjotjai.raw.EndRecord
 import com.benwrk.jabjotjai.raw.EndingNote
 import com.benwrk.jabjotjai.raw.EventRecord
+import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.HrRecord
 import com.benwrk.jabjotjai.raw.ProcessExit
 import com.benwrk.jabjotjai.raw.RawCodec
+import com.benwrk.jabjotjai.raw.RawDecoders
 import com.benwrk.jabjotjai.raw.RawLine
+import com.benwrk.jabjotjai.raw.RawSchema
 import com.benwrk.jabjotjai.raw.RawTail
 import com.benwrk.jabjotjai.raw.Stamp
+import com.benwrk.jabjotjai.raw.UnreadableRawFileException
 import java.io.File
+import java.io.IOException
 import java.io.RandomAccessFile
 
 /** The capture that is running, as remembered across the app's process dying (decision `0013`). */
@@ -81,6 +86,18 @@ data class UncleanEnd(val capture: RunningCapture, val note: EndingNote) {
     val resumesByItself: Boolean get() = ExitReasons.resumesByItself(note.exit)
 }
 
+/** What looking for a capture the app did not end found. */
+sealed interface Recovery {
+    /** No remembered capture was left unfinished, or this process is running it. */
+    data object None : Recovery
+
+    /** A capture that ended without its `end` record, its note written. */
+    data class Found(val unclean: UncleanEnd) : Recovery
+
+    /** Whether the remembered capture ended could not be told: [message] says what could not be read or written. */
+    data class Failed(val message: String) : Recovery
+}
+
 /**
  * Keeps a look for an unfinished capture away from a capture this process is running. Such a look
  * takes the remembered capture for one the app did not end whenever its file has no `end` record,
@@ -131,36 +148,76 @@ object CaptureRecovery {
     fun release(context: Context, ended: Boolean) = guard.release { if (ended) RunningCaptureStore.clear(context) }
 
     /**
-     * The capture that ended uncleanly, its note written if it was not already; null if there is
-     * none, or while this process is running one.
+     * The capture that ended uncleanly, its note written if it was not already; [Recovery.None] if
+     * there is none, or while this process is running one; [Recovery.Failed] if its file or note
+     * could not be read or written, so whether it ended cannot be told.
      */
-    fun find(context: Context): UncleanEnd? = guard.unlessHeld { look(context) }
+    fun find(context: Context): Recovery = guard.unlessHeld { look(context) } ?: Recovery.None
 
-    private fun look(context: Context): UncleanEnd? {
-        val capture = RunningCaptureStore.load(context) ?: return null
+    private fun look(context: Context): Recovery {
+        val capture = RunningCaptureStore.load(context) ?: return Recovery.None
         if (!capture.file.isFile) {
+            // Remembered, but stopped before its file was made: nothing was recorded.
             RunningCaptureStore.clear(context)
-            return null
+            return Recovery.None
         }
-        val lines = lastLines(capture.file)
-        if (lines.any { it is RawLine.Record && it.record is EndRecord }) {
-            // It ended properly after all, and only forgetting it was cut short.
-            RunningCaptureStore.clear(context)
-            return null
+        return when (val inspected = inspect(capture.file, capture.session, System.currentTimeMillis()) { lastExit(context, it) }) {
+            Inspection.Ended -> {
+                // It ended properly after all, and only forgetting it was cut short.
+                RunningCaptureStore.clear(context)
+                Recovery.None
+            }
+            is Inspection.Unclean -> {
+                Log.i(TAG, "${capture.session} ended without its end record: ${inspected.note.exit?.reason ?: "no exit record"}")
+                Recovery.Found(UncleanEnd(capture, inspected.note))
+            }
+            is Inspection.Failed -> {
+                Log.w(TAG, "cannot tell how ${capture.session} ended: ${inspected.message}")
+                Recovery.Failed(inspected.message)
+            }
         }
-        val noteFile = ending(capture.file)
-        val existing = noteFile.takeIf { it.isFile }?.readText()?.trim()?.let(RawCodec::decodeEnding)
-        val note = existing ?: EndingNote(
-            session = capture.session,
-            notedWallMs = System.currentTimeMillis(),
-            lastLine = lines.asReversed().firstNotNullOfOrNull { stampOf(it) },
-            exit = lastExit(context, startWallMs = runCatching { RawTail.readHeader(capture.file) }.getOrNull()?.start?.wallMs),
-        ).also {
-            noteFile.writeText(RawCodec.encode(it) + "\n")
-            Log.i(TAG, "noted how ${capture.session} ended: ${it.exit?.reason ?: "no record"}")
-        }
-        return UncleanEnd(capture, note)
     }
+
+    /** What [inspect] found in a remembered capture's file. */
+    internal sealed interface Inspection {
+        data object Ended : Inspection
+        data class Unclean(val note: EndingNote) : Inspection
+        data class Failed(val message: String) : Inspection
+    }
+
+    /**
+     * Whether [file] ended with its `end` record, and if not, the ending note beside it: the one
+     * already there, or a new one written now with [exitAfter]'s record of how the process ended
+     * after the capture's start. The last lines are decoded as the file's header says (decision
+     * `0006`). A header, file or note that cannot be read, or a note that cannot be written, is a
+     * failure; an existing note is never written over.
+     */
+    internal fun inspect(file: File, session: String, notedWallMs: Long, exitAfter: (startWallMs: Long?) -> ProcessExit?): Inspection = try {
+        val header = RawTail.readHeader(file)
+        val lines = if (header == null) emptyList() else lastLines(file, decoderFor(header, file))
+        val noteFile = ending(file)
+        when {
+            lines.any { it is RawLine.Record && it.record is EndRecord } -> Inspection.Ended
+            noteFile.isFile -> RawCodec.decodeEnding(noteFile.readText().trim())?.let { Inspection.Unclean(it) }
+                ?: Inspection.Failed("the ending note ${noteFile.name} cannot be read")
+            else -> {
+                val note = EndingNote(
+                    session = session,
+                    notedWallMs = notedWallMs,
+                    lastLine = lines.asReversed().firstNotNullOfOrNull { stampOf(it) },
+                    exit = exitAfter(header?.start?.wallMs),
+                )
+                noteFile.writeText(RawCodec.encode(note) + "\n")
+                Inspection.Unclean(note)
+            }
+        }
+    } catch (e: IOException) {
+        Inspection.Failed(e.message ?: e.toString())
+    }
+
+    private fun decoderFor(header: HeaderRecord, file: File): (String) -> RawLine =
+        RawSchema.parse(header.schema)?.let(RawDecoders::forSchema)
+            ?: throw UnreadableRawFileException("$file declares schema ${header.schema}, which this build cannot read")
 
     /** Android's record of the app's last process exit after the capture began, if it kept one. */
     private fun lastExit(context: Context, startWallMs: Long?): ProcessExit? {
@@ -171,7 +228,7 @@ object CaptureRecovery {
     }
 
     /** The complete lines in the last part of the file, decoded; a torn last line is left out. */
-    private fun lastLines(file: File): List<RawLine> {
+    private fun lastLines(file: File, decode: (String) -> RawLine): List<RawLine> {
         val text = RandomAccessFile(file, "r").use { raf ->
             val start = (raf.length() - TAIL_BYTES).coerceAtLeast(0L)
             val bytes = ByteArray((raf.length() - start).toInt())
@@ -180,7 +237,8 @@ object CaptureRecovery {
             String(bytes, Charsets.UTF_8)
         }
         val complete = text.substringBeforeLast('\n', missingDelimiterValue = "")
-        return complete.split('\n').drop(1).filter { it.isNotBlank() }.map(RawCodec::decode)
+        // The first line read may be the end of one that started earlier, so it is left out.
+        return complete.split('\n').drop(1).filter { it.isNotBlank() }.map(decode)
     }
 
     private fun stampOf(line: RawLine): Stamp? = when (val record = (line as? RawLine.Record)?.record) {

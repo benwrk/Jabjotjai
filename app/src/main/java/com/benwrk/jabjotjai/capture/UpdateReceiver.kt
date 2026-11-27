@@ -17,9 +17,15 @@ class UpdateReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         // Finds nothing if the service has already resumed the capture, or is resuming it, in
         // this process.
-        val unclean = CaptureRecovery.find(context)
-        Log.i(TAG, "updated; capture to resume: ${unclean?.capture?.session}, by itself: ${unclean?.resumesByItself}")
-        if (unclean != null && unclean.resumesByItself) Capture.resume(context, unclean.capture)
+        when (val found = CaptureRecovery.find(context)) {
+            is Recovery.Found -> {
+                Log.i(TAG, "updated; capture to resume: ${found.unclean.capture.session}, by itself: ${found.unclean.resumesByItself}")
+                if (found.unclean.resumesByItself) Capture.resume(context, found.unclean.capture)
+            }
+            // Shown again when the app is next opened, which looks once more.
+            is Recovery.Failed -> Log.w(TAG, "updated; cannot tell how the last capture ended: ${found.message}")
+            Recovery.None -> Log.i(TAG, "updated; no capture to resume")
+        }
     }
 
     private companion object {

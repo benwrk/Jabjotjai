@@ -28,6 +28,8 @@
     <string name="resume_why_unknown">the app was stopped</string>
     <string name="resume_resume">Resume</string>
     <string name="resume_dismiss">Dismiss</string>
+    <string name="recovery_failed_title">The last capture could not be checked</string>
+    <string name="recovery_failed_body">Whether the last capture ended properly could not be told: %1$s. Its recording, as far as it was written, is kept.</string>
 
     <string name="monitor_hr">HR</string>
     <string name="monitor_bpm">bpm</string>
