@@ -1,11 +1,14 @@
 # In CI, "plugin was not found" can be a failed download, not a missing plugin
 
-A closed investigation, not a solved one: the cause was never confirmed.
+The download failure itself is unexplained. Why it then kept coming back is explained: a failed
+run's incomplete Gradle cache was kept and restored (see "Why reruns kept failing").
 
 ## What happened
 
 On 2026-11-27 the CI run for tag `v0.2.0` (run 46004980566, attempt 1) failed in 27 seconds,
-while `settings.gradle.kts` was being evaluated:
+while `settings.gradle.kts` was being evaluated. Later the same day it happened three times in a
+row: master run 46035021402 at 16:36:21Z and its rerun at 16:38:05Z, then the `v0.5.0` tag run
+46036187683. A master run between them, 46035565533 at 16:40:18Z, passed. Each failure was:
 
 ```
 Plugin [id: 'org.gradle.toolchains.foojay-resolver-convention', version: '1.0.0'] was not found
@@ -39,6 +42,19 @@ Searched in the following repositories: Google, MavenRepo, Gradle Central Plugin
   an exact hit on the cache the master run had saved, and needed no plugin download at all. Its
   success says nothing about whether the repositories had recovered.
 
+## Why reruns kept failing
+
+- **setup-gradle saves its cache even when the build fails.** Run 46035021402's first attempt
+  started with no cache entry for its build files, failed on the plugin, and saved key
+  `setup-java-Linux-x64-gradle-1e8d8f15…`. That entry was 129 MiB, where a complete one was
+  about 596 MiB: little more than the Gradle distribution.
+- **An entry is never replaced.** setup-gradle's docs say "once a cache entry is written for a
+  key, it cannot be overwritten" (v6.4.1). The key is a hash of the build files, so every later
+  run with the same build files restored the incomplete entry, and its own save was refused
+  with "already exists". The rerun, the passing master run and the tag run all restored it.
+- So every one of those runs downloaded everything again, and the flaky download had another
+  chance to fail each time. A complete cache would have needed almost no network.
+
 ## Leading explanation, unconfirmed
 
 Maven Central rate limiting. Sonatype says a 429 "means the aggregate traffic Maven Central sees
@@ -50,12 +66,12 @@ blocked that day was not checked, and nothing recorded the status code, so this 
 
 ## If it happens again
 
-- Re-run the failed job from GitHub. If master's run for the same commit has finished, the
-  rerun restores its cache.
-- Before re-running, capture what the runner actually received. A `--debug` run of only the
-  failing configuration (`./gradlew help --debug`, written to a file and searched for
-  `Could not GET` and `Caused by`) names the repository and the error.
+- Read the failed run's "Record what the repositories answer" step. Since commit `c0b7338`, CI
+  prints each repository's HTTP status to the runner and the failing request from a `--debug`
+  attempt whenever the build step fails. A 429 there confirms rate limiting.
+- Delete the cache entry the failed run saved (`gh cache list`, then `gh cache delete <id>`),
+  or every rerun restores it. A cache entry of well under 500 MiB is the sign.
+- Then re-run. A version tag goes up only after master's run for that commit has passed, so the
+  tag run starts from a complete cache.
 - Keep a `--debug` log out of uploaded artifacts. The job log showed the signing passwords as
   `***`, but nothing checked that an artifact gets the same treatment.
-- Push a version tag after master's run for that commit has finished, not alongside it, so the
-  tag run starts from master's cache.

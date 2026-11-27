@@ -11,4 +11,4 @@ Anything that binds one area belongs in [`docs/rules/`](../rules/); anything wit
 alternative belongs in [`docs/decisions/`](../decisions/).
 
 - [PowerShell pipes can change the bytes they pass on](powershell-pipes-change-bytes.md) — piping text into git added an invisible byte-order mark, and captured output gains `\r\n`; pass text as arguments and check raw bytes
-- [In CI, "plugin was not found" can be a failed download](ci-plugin-not-found-can-be-a-network-failure.md) — Gradle prints the same message for a network error as for a missing plugin, and only `--debug` shows which; what was ruled out on 2026-11-27 and what to capture next time
+- [In CI, "plugin was not found" can be a failed download](ci-plugin-not-found-can-be-a-network-failure.md) — Gradle prints the same message for a network error as for a missing plugin, and only `--debug` shows which; a failed run's incomplete cache entry must be deleted before rerunning, or every rerun restores it
