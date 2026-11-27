@@ -57,16 +57,13 @@ The capture notification shows heart rate on the lock screen, the owner's chosen
 (`docs/spec.md`, 0.1 item 4). Done when a setting switches the notification to showing only that
 a capture is running and for how long, with the full content after unlocking.
 
-## Confirm the agent conventions in a fresh Claude Code session
+## Confirm the `SessionStart` hook in a fresh Claude Code session
 
-Two mechanisms can only fire at session start or once per session, so neither has been observed
-working:
+It can only fire at session start, so it has not been observed working. Run
+`git config --unset core.hooksPath`, start a session, and check that `git config core.hooksPath`
+prints `.githooks` again (decision `0002`). Done when seen working; if it fails, record what was
+observed.
 
-- **The path-scoped pointer arrives and is followed.** Touch a file under `docs/decisions/` and
-  check that the pointer in `.claude/rules/decisions.md` reaches the session and that the agent
-  then reads `docs/rules/decisions.md` (decision `0001`).
-- **The `SessionStart` hook sets `core.hooksPath`.** Run `git config --unset core.hooksPath`,
-  start a session, and check that `git config core.hooksPath` prints `.githooks` again (decision
-  `0002`).
-
-Done when both have been seen working; if either fails, record what was observed.
+The other mechanism this entry used to track, the path-scoped pointer, was seen working on
+2026-11-27: writing a file under `docs/decisions/` brought the pointer from
+`.claude/rules/decisions.md` into the session (decision `0001`).
