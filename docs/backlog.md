@@ -24,6 +24,18 @@ if it carries "a valid proof-of-rotation" (developer.android.com/google/play/app
 updated to it without an uninstall (seen on the device, with the date), CI's secrets and expected
 certificate digest name the new key, and a decision records it.
 
+## Test interrupted captures in CI, without a strap
+
+The stop-and-resume paths of decision `0013` (an update, Force stop, a kill that Android restarts,
+swiping the app away) have only been checked by hand, on the test phone with a strap on. Before a
+release, that check on a real phone with a real strap is recommended but must not be required,
+so the paths that matter need a test that runs on every push.
+
+Done when instrumented tests on an emulator in CI drive a capture fed by a fake strap, interrupt
+it each of those ways, and check the raw files (ending note and reason, the resumed file's
+`continues`, frames after the resume); the fake strap exists only in the test source set, never
+as a switch in a shipped build (`AGENTS.md`); and a decision records the approach.
+
 ## Finish proving 0.3 on the test phone
 
 Seen working on 2026-11-27: an update during a capture resumed it into a new file whose header
