@@ -114,15 +114,15 @@ jobs:
           version_of() {
             "$tools/aapt2" dump badging "$1" | sed -n "s/^package: .* versionName='\([^']*\)'.*/\1/p"
           }
-          # Each distinct certificate the APK's signers use. The full output goes to the log, since
-          # its wording differs between build-tools versions: 36.0.0 prints "Signer #1 certificate
-          # SHA-256 digest: ...", and on the runner's 37.0.0 that pattern matched nothing (seen
-          # 2026-11-27).
+          # Each distinct certificate the APK's signers use. The wording differs between build-tools
+          # versions: 36.0.0 prints "Signer #1 certificate SHA-256 digest: ..." and 37.0.0 prints
+          # "V2 Signer: certificate SHA-256 digest: ..." (both seen 2026-11-27), so the full output
+          # also goes to the log.
           signers_of() {
             local certs
             certs=$("$tools/apksigner" verify --print-certs "$1")
             printf 'apksigner verify --print-certs %s:\n%s\n' "$1" "$certs" >&2
-            sed -n 's/^Signer.* certificate SHA-256 digest: //p' <<< "$certs" | sort -u
+            sed -n 's/^.*Signer.* certificate SHA-256 digest: //p' <<< "$certs" | sort -u
           }
           debug=app/build/outputs/apk/debug/app-debug.apk
           release=app/build/outputs/apk/release/app-release.apk
