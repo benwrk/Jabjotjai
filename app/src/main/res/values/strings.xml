@@ -31,7 +31,17 @@
     <string name="monitor_connecting">Connecting</string>
     <string name="monitor_connected">Connected</string>
     <string name="monitor_disconnected">Disconnected</string>
-    <string name="monitor_ecg_label">ECG · 1 mV · 25 mm/s</string>
-    <string name="monitor_acc_label">ACC %1$s · ±2 g</string>
+    <string name="monitor_ecg_label">ECG · ×%1$s · %2$s mm/mV · %3$s mm/s</string>
+    <string name="monitor_acc_label">ACC</string>
+    <string name="monitor_acc_scale">· %1$s mm/g</string>
+    <string name="monitor_auto">· auto</string>
     <string name="monitor_read_error">Cannot read the raw file: %1$s</string>
+
+    <string name="display_open">Display</string>
+    <string name="display_title">Display</string>
+    <string name="display_sweep">Sweep speed, mm/s</string>
+    <string name="display_ecg_gain">ECG gain</string>
+    <string name="display_acc_scale">Accelerometer scale, mm/g</string>
+    <string name="display_auto">Auto</string>
+    <string name="display_gain_step">×%1$s</string>
 </resources>

@@ -142,8 +142,8 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
     )
 
     companion object {
-        /** Fifteen seconds: more than a sweep across a large tablet at 25 mm/s. */
-        const val DEFAULT_KEEP_NS: Long = 15_000_000_000L
+        /** Forty seconds: a sweep 250 mm wide, a large tablet's, at the slowest speed, 6.25 mm/s. */
+        const val DEFAULT_KEEP_NS: Long = 40_000_000_000L
     }
 }
 
@@ -194,3 +194,10 @@ internal class SampleSeries(initialCapacity: Int = 1024) {
         end = count
     }
 }
+
+/** A heart rate older than this is shown as no value rather than as a current reading. */
+const val HR_STALE_NS: Long = 5_000_000_000L
+
+/** The heart rate to show at [nowMonoNs]: the latest report, or null once it is [HR_STALE_NS] old. */
+fun MonitorSnapshot.currentHeartRate(nowMonoNs: Long): HeartRate? =
+    heartRate?.takeIf { nowMonoNs - it.receivedMonoNs < HR_STALE_NS }

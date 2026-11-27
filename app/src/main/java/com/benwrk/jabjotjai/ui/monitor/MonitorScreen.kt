@@ -19,14 +19,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,30 +41,41 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.capture.CaptureState
+import com.benwrk.jabjotjai.monitor.AutoScale
+import com.benwrk.jabjotjai.monitor.BandScale
+import com.benwrk.jabjotjai.monitor.DisplaySettings
 import com.benwrk.jabjotjai.monitor.HeartRate
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
-import com.benwrk.jabjotjai.monitor.Sweep
+import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.TraceSnapshot
+import com.benwrk.jabjotjai.monitor.currentHeartRate
 import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import kotlinx.coroutines.delay
 
-/** The accelerometer bands span ±2 g on screen; the file keeps whatever range the strap used. */
-private const val ACC_HALF_RANGE_MG = 2_000f
+/** How often an automatic scale looks at its trace again. */
+private const val AUTO_SCALE_TICK_MS = 250L
 
-/** A heart rate older than this is shown as no value rather than as a current reading. */
-private const val HR_STALE_NS = 5_000_000_000L
+/** The height a band's label takes at its top, which the calibration pulse stays below. */
+private val LABEL_SPACE = 20.dp
 
 /**
  * The live monitor, laid out like a bedside patient monitor: waveforms sweeping on black, with the
@@ -74,15 +92,28 @@ fun MonitorScreen(
     KeepScreenOn()
     val snapshot = viewModel.snapshot.collectAsState()
     val readError by viewModel.readError.collectAsState()
+    val settings = viewModel.displaySettings.collectAsState()
     val frameClock = rememberFrameClock()
     val secondsClock = rememberSecondsClock()
     val pxPerMm = rememberPxPerMm()
 
+    val ecgBandMm = remember { mutableFloatStateOf(0f) }
+    val accBandMm = remember { mutableFloatStateOf(0f) }
+    val ecgScale = rememberBandScale(snapshot, ScaleLadder.ECG, settings.value.ecgAuto, settings.value.ecgGainIndex, ecgBandMm) {
+        listOf(it.ecg)
+    }
+    val accScale = rememberBandScale(snapshot, ScaleLadder.ACC, settings.value.accAuto, settings.value.accScaleIndex, accBandMm) {
+        listOf(it.accX, it.accY, it.accZ)
+    }
+    var showDisplaySheet by rememberSaveable { mutableStateOf(false) }
+
+    // Every argument is a remembered state object, so one holder serves for as long as the scale holds.
+    val bands = remember(pxPerMm) { Bands(snapshot, frameClock, pxPerMm, settings, ecgScale, accScale, ecgBandMm, accBandMm) }
     BoxWithConstraints(modifier.fillMaxSize().background(MonitorColors.Background)) {
         val landscape = maxWidth > maxHeight
         val numericsWidth = maxWidth * 0.26f
         Column(Modifier.fillMaxSize()) {
-            StatusBar(snapshot.value, running, secondsClock.value, onStop)
+            StatusBar(snapshot.value, running, secondsClock.value, onDisplay = { showDisplaySheet = true }, onStop)
             readError?.let {
                 Text(
                     stringResource(R.string.monitor_read_error, it),
@@ -92,19 +123,43 @@ fun MonitorScreen(
             }
             if (landscape) {
                 Row(Modifier.fillMaxSize()) {
-                    Waveforms(snapshot, frameClock, pxPerMm, Modifier.weight(1f).fillMaxHeight())
-                    Numerics(snapshot.value, secondsClock.value, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
+                    Waveforms(bands, Modifier.weight(1f).fillMaxHeight())
+                    Numerics(snapshot, secondsClock.value, vertical = true, Modifier.width(numericsWidth).fillMaxHeight())
                 }
             } else {
-                Numerics(snapshot.value, secondsClock.value, vertical = false, Modifier.fillMaxWidth())
-                Waveforms(snapshot, frameClock, pxPerMm, Modifier.weight(1f).fillMaxWidth())
+                Numerics(snapshot, secondsClock.value, vertical = false, Modifier.fillMaxWidth())
+                Waveforms(bands, Modifier.weight(1f).fillMaxWidth())
             }
         }
     }
+
+    if (showDisplaySheet) {
+        DisplaySheet(
+            settings = settings.value,
+            ecgIndex = ecgScale.value.index,
+            accIndex = accScale.value.index,
+            onChange = viewModel::updateDisplaySettings,
+            onDismiss = { showDisplaySheet = false },
+        )
+    }
+}
+
+/** What the waveform bands draw from, gathered so the two layouts pass one value. */
+private class Bands(
+    val snapshot: State<MonitorSnapshot>,
+    val frameClock: State<Long>,
+    val pxPerMm: Float,
+    val settings: State<DisplaySettings>,
+    val ecgScale: State<BandScale>,
+    val accScale: State<BandScale>,
+    val ecgBandMm: MutableFloatState,
+    val accBandMm: MutableFloatState,
+) {
+    val mmPerSecond: () -> Float = { settings.value.sweep.mmPerSecond }
 }
 
 @Composable
-private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, nowMonoNs: Long, onStop: () -> Unit) {
+private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, nowMonoNs: Long, onDisplay: () -> Unit, onStop: () -> Unit) {
     val (connection, connectionColor) = when (snapshot.connection) {
         RawEvents.CONNECTED -> stringResource(R.string.monitor_connected) to MonitorColors.Ecg
         RawEvents.CONNECTING -> stringResource(R.string.monitor_connecting) to MonitorColors.Warning
@@ -120,99 +175,147 @@ private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, 
         Text(connection, color = connectionColor, style = MaterialTheme.typography.titleSmall)
         Text(elapsed(snapshot.header, nowMonoNs), color = MonitorColors.Secondary, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.weight(1f))
+        TextButton(onClick = onDisplay) { Text(stringResource(R.string.display_open), color = MonitorColors.Text) }
         OutlinedButton(onClick = onStop, border = BorderStroke(1.dp, MonitorColors.Alarm)) {
             Text(stringResource(R.string.stop), color = MonitorColors.Alarm)
         }
     }
 }
 
+/** The ECG band above one accelerometer band holding all three axes, each half the height. */
 @Composable
-private fun Waveforms(snapshot: State<MonitorSnapshot>, frameClock: State<Long>, pxPerMm: Float, modifier: Modifier) {
+private fun Waveforms(bands: Bands, modifier: Modifier) {
     Column(modifier) {
-        Band(stringResource(R.string.monitor_ecg_label), MonitorColors.Ecg, Modifier.weight(2f)) {
-            SweepTrace(
-                snapshot = snapshot,
-                nowMonoNs = frameClock,
-                trace = { it.ecg },
-                timing = { it.ecgTiming },
-                color = MonitorColors.Ecg,
-                pxPerMm = pxPerMm,
-                offsetPx = { microvolts, _ -> microvolts * Sweep.MM_PER_MICROVOLT * pxPerMm },
-                modifier = Modifier.fillMaxSize(),
-            )
-            CalibrationPulse(pxPerMm, Modifier.fillMaxSize())
-        }
-        AccBand("X", MonitorColors.AccX, snapshot, frameClock, pxPerMm, Modifier.weight(1f)) { it.accX }
-        AccBand("Y", MonitorColors.AccY, snapshot, frameClock, pxPerMm, Modifier.weight(1f)) { it.accY }
-        AccBand("Z", MonitorColors.AccZ, snapshot, frameClock, pxPerMm, Modifier.weight(1f)) { it.accZ }
+        EcgBand(bands, Modifier.weight(1f).onSizeChanged { bands.ecgBandMm.floatValue = it.height / bands.pxPerMm })
+        AccBand(bands, Modifier.weight(1f).onSizeChanged { bands.accBandMm.floatValue = it.height / bands.pxPerMm })
     }
 }
 
 @Composable
-private fun AccBand(
-    axis: String,
-    color: Color,
-    snapshot: State<MonitorSnapshot>,
-    frameClock: State<Long>,
-    pxPerMm: Float,
-    modifier: Modifier,
-    trace: (MonitorSnapshot) -> TraceSnapshot,
-) {
-    Band(stringResource(R.string.monitor_acc_label, axis), color, modifier) {
+private fun EcgBand(bands: Bands, modifier: Modifier) {
+    val scale = bands.ecgScale.value
+    val gain = ScaleLadder.ECG.mmPerUnit(scale.index)
+    val label = stringResource(
+        R.string.monitor_ecg_label,
+        plainNumber(ecgMultiple(scale.index)),
+        plainNumber(gain),
+        plainNumber(bands.settings.value.sweep.mmPerSecond),
+    ) + if (bands.settings.value.ecgAuto) " " + stringResource(R.string.monitor_auto) else ""
+    Band(label = { Text(label, color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall) }, modifier) {
         SweepTrace(
-            snapshot = snapshot,
-            nowMonoNs = frameClock,
-            trace = trace,
-            timing = { it.accTiming },
-            color = color,
-            pxPerMm = pxPerMm,
-            offsetPx = { milliG, half -> milliG / ACC_HALF_RANGE_MG * half * 0.9f },
+            snapshot = bands.snapshot,
+            nowMonoNs = bands.frameClock,
+            trace = { it.ecg },
+            timing = { it.ecgTiming },
+            color = MonitorColors.Ecg,
+            pxPerMm = bands.pxPerMm,
+            mmPerSecond = bands.mmPerSecond,
+            offsetPx = bandOffset(ScaleLadder.ECG, bands.ecgScale, bands.pxPerMm),
             modifier = Modifier.fillMaxSize(),
         )
+        CalibrationPulse(bands, Modifier.fillMaxSize())
     }
+}
+
+/**
+ * X, Y and Z on one scale and around one centre, so each axis keeps its true level (gravity
+ * included) relative to the others.
+ */
+@Composable
+private fun AccBand(bands: Bands, modifier: Modifier) {
+    val scale = bands.accScale.value
+    val title = stringResource(R.string.monitor_acc_label)
+    val scaleText = stringResource(R.string.monitor_acc_scale, plainNumber(ScaleLadder.ACC.mmPerUnit(scale.index))) +
+        if (bands.settings.value.accAuto) " " + stringResource(R.string.monitor_auto) else ""
+    val label = buildAnnotatedString {
+        withStyle(SpanStyle(color = MonitorColors.Text)) { append(title) }
+        for (axis in ACC_AXES) {
+            append(" ")
+            withStyle(SpanStyle(color = axis.color)) { append(axis.name) }
+        }
+        withStyle(SpanStyle(color = MonitorColors.Text)) { append(" $scaleText") }
+    }
+    Band(label = { Text(label, style = MaterialTheme.typography.labelSmall) }, modifier) {
+        val offset = bandOffset(ScaleLadder.ACC, bands.accScale, bands.pxPerMm)
+        for (axis in ACC_AXES) {
+            SweepTrace(
+                snapshot = bands.snapshot,
+                nowMonoNs = bands.frameClock,
+                trace = axis.trace,
+                timing = { it.accTiming },
+                color = axis.color,
+                pxPerMm = bands.pxPerMm,
+                mmPerSecond = bands.mmPerSecond,
+                offsetPx = offset,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+private class AccAxis(val name: String, val color: Color, val trace: (MonitorSnapshot) -> TraceSnapshot)
+
+private val ACC_AXES = listOf(
+    AccAxis("X", MonitorColors.AccX) { it.accX },
+    AccAxis("Y", MonitorColors.AccY) { it.accY },
+    AccAxis("Z", MonitorColors.AccZ) { it.accZ },
+)
+
+/** How far above a band's middle line a sample is drawn, at the band's current scale. */
+private fun bandOffset(ladder: ScaleLadder, scale: State<BandScale>, pxPerMm: Float): (Int) -> Float = { value ->
+    val current = scale.value
+    (value - current.centre) * ladder.mmPerSample(current.index) * pxPerMm
 }
 
 /** One waveform band: its label at the top left and a thin rule below it. */
 @Composable
-private fun Band(label: String, color: Color, modifier: Modifier, content: @Composable () -> Unit) {
+private fun Band(label: @Composable () -> Unit, modifier: Modifier, content: @Composable () -> Unit) {
     Box(modifier.fillMaxWidth()) {
         content()
-        Text(label, color = color, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 8.dp, top = 2.dp))
+        Box(Modifier.padding(start = 8.dp, top = 2.dp)) { label() }
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(MonitorColors.Divider))
     }
 }
 
-/** The standard 1 mV calibration pulse at the left edge: 10 mm tall and 0.2 s wide at 25 mm/s. */
+/**
+ * The 1 mV calibration pulse at the left edge, 0.2 s wide, at the band's current gain and sweep
+ * speed. It stands on the bottom of the band, below the label. Where 1 mV is taller than the room
+ * under the label, its top is cut there and marked as clipped, like the trace.
+ */
 @Composable
-private fun CalibrationPulse(pxPerMm: Float, modifier: Modifier) {
+private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
     Canvas(modifier) {
-        val baseline = size.height / 2f
+        val bottom = size.height - 4.dp.toPx()
+        val ceiling = LABEL_SPACE.toPx()
         val left = 8.dp.toPx()
-        val height = 1_000 * Sweep.MM_PER_MICROVOLT * pxPerMm
-        val width = 0.2f * Sweep.MM_PER_SECOND * pxPerMm
+        val height = ScaleLadder.ECG.mmPerUnit(bands.ecgScale.value.index) * bands.pxPerMm
+        val width = 0.2f * bands.mmPerSecond() * bands.pxPerMm
+        val top = maxOf(bottom - height, ceiling)
         val path = Path().apply {
-            moveTo(left, baseline)
-            lineTo(left, baseline - height)
-            lineTo(left + width, baseline - height)
-            lineTo(left + width, baseline)
+            moveTo(left, bottom)
+            lineTo(left, top)
+            lineTo(left + width, top)
+            lineTo(left + width, bottom)
         }
         drawPath(path, MonitorColors.Ecg.copy(alpha = 0.6f), style = Stroke(width = 1.dp.toPx()))
-        drawLine(MonitorColors.Divider, Offset(0f, baseline), Offset(left, baseline))
+        if (bottom - height < ceiling) {
+            drawLine(MonitorColors.Clipped, Offset(left, top), Offset(left + width, top), strokeWidth = 1.dp.toPx())
+        }
     }
 }
 
 @Composable
-private fun Numerics(snapshot: MonitorSnapshot, nowMonoNs: Long, vertical: Boolean, modifier: Modifier) {
-    val heartRate = snapshot.heartRate?.takeIf { nowMonoNs - it.receivedMonoNs < HR_STALE_NS }
+private fun Numerics(snapshot: State<MonitorSnapshot>, nowMonoNs: Long, vertical: Boolean, modifier: Modifier) {
+    val heartRate = snapshot.value.currentHeartRate(nowMonoNs)
     if (vertical) {
         Column(modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             HeartRateNumeric(heartRate)
-            Details(heartRate, snapshot)
+            Details(heartRate, snapshot.value)
         }
     } else {
         Row(modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Bottom) {
             HeartRateNumeric(heartRate)
-            Details(heartRate, snapshot)
+            Details(heartRate, snapshot.value)
         }
     }
 }
@@ -248,6 +351,43 @@ private fun Details(heartRate: HeartRate?, snapshot: MonitorSnapshot) {
         Text(stringResource(R.string.monitor_gaps, snapshot.gaps), color = if (snapshot.gaps > 0) MonitorColors.Warning else MonitorColors.Secondary)
     }
 }
+
+/**
+ * A band's scale: fixed at [fixedIndex] around zero, or chosen by [AutoScale] from the band's
+ * recent [traces]. Saved across the activity being recreated, such as on rotation, so an automatic
+ * scale does not start over. Auto scaling runs only while the screen is showing.
+ */
+@Composable
+private fun rememberBandScale(
+    snapshot: State<MonitorSnapshot>,
+    ladder: ScaleLadder,
+    auto: Boolean,
+    fixedIndex: Int,
+    bandMm: State<Float>,
+    traces: (MonitorSnapshot) -> List<TraceSnapshot>,
+): State<BandScale> {
+    val scale = rememberSaveable(stateSaver = BandScaleSaver) { mutableStateOf(BandScale(fixedIndex, centre = 0)) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(auto, fixedIndex, lifecycleOwner) {
+        if (!auto) {
+            scale.value = BandScale(fixedIndex, centre = 0)
+            return@LaunchedEffect
+        }
+        val autoScale = AutoScale(ladder, initial = scale.value)
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                scale.value = autoScale.update(traces(snapshot.value), bandMm.value, SystemClock.elapsedRealtimeNanos())
+                delay(AUTO_SCALE_TICK_MS)
+            }
+        }
+    }
+    return scale
+}
+
+private val BandScaleSaver = listSaver<BandScale, Int>(
+    save = { listOf(it.index, it.centre) },
+    restore = { BandScale(index = it[0], centre = it[1]) },
+)
 
 /** Time since the capture started, from the header's monotonic stamp, as `h:mm:ss`. */
 private fun elapsed(header: HeaderRecord?, nowMonoNs: Long): String {

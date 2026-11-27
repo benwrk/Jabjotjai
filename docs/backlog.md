@@ -36,18 +36,10 @@ actual device. 0.1 has no such step. Done when a first-run checklist exists and 
 settings paths has been checked on the test phone (Galaxy S25, Android 17, One UI 9.0), with the
 date.
 
-## The ECG trace clips on a phone in landscape
+## Check the calibration pulse clears the ECG label in portrait
 
-At the standard 10 mm/mV, the ECG band in landscape is about 20 mm tall on the test phone, so R
-and S waves beyond about ±1 mV are cut off at the band edges (seen 2026-11-27). The file holds the
-true values; only the display clips. Done when the display gain can be changed (a monitor's usual
-×0.5, ×1, ×2), with the label and calibration pulse following it, or when the owner chooses a
-different fix.
-
-## The calibration pulse overlaps the ECG label
-
-The 1 mV pulse at the left edge is drawn over "ECG · 1 mV · 25 mm/s" (seen 2026-11-27). Done when
-neither covers the other in either orientation.
+The pulse now stands on the bottom of the band and stops below the label, and in landscape on the
+test phone the two no longer touch (seen 2026-11-27). Done when the same is seen in portrait.
 
 ## Record a stream that goes silent while the strap is connected
 

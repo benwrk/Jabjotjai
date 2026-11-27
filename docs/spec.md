@@ -19,8 +19,20 @@ The current scope. Nothing beyond it is built until it works on a real phone wit
 2. **Show live, in the style of a bedside patient monitor:**
    - the ECG waveform;
    - heart rate as a large numeric, as the strap reports it;
-   - the accelerometer as three raw traces, X, Y and Z, with nothing derived from them,
-     requested at 200 Hz and 8 G.
+   - the accelerometer as three raw traces, X, Y and Z, in one band on one shared scale and
+     centre, so each axis keeps its true level, with nothing derived from them, requested at
+     200 Hz and 8 G.
+
+   The user can change how it is drawn, and the choices are kept between runs:
+   - the sweep speed: 6.25, 12.5, 25 or 50 mm/s;
+   - the ECG gain, from ×0.25 to ×4 of 10 mm/mV, and the accelerometer scale, from 1.25 to
+     40 mm/g, each either fixed or automatic. Automatic is the default: it picks one of the same
+     steps from the last few seconds of the trace, ignoring a second or two of outliers, and moves
+     the band to keep the trace in its middle. The label always states the step in use, and the
+     1 mV calibration pulse follows the gain and the speed.
+
+   A stretch of trace beyond the edge of its band is drawn on the edge and marked as clipped, so
+   a peak the display cut off cannot pass for the shape of the wave.
 3. **The display reads the raw file.** The connection writes everything the strap sends to an
    append-only raw file (schema 1.0, `docs/raw-format.md`), and the monitor draws by tailing that
    file, so what is shown is exactly what is stored (`AGENTS.md`, "Live is a reader tailing the

@@ -96,6 +96,15 @@ class MonitorModelTest {
     }
 
     @Test
+    fun aHeartRateIsShownForFiveSecondsAfterItArrives() {
+        val model = MonitorModel()
+        model.feed(HrRecord(0, 9, bpm = 60, rr1024 = listOf(1024), rrMs = listOf(1000), rrAvailable = true, contact = true, contactSupported = true, correctedBpm = 0, ppgQuality = 0))
+        val snapshot = model.snapshot()
+        assertEquals(60, snapshot.currentHeartRate(nowMonoNs = 9 + HR_STALE_NS - 1)?.bpm)
+        assertNull(snapshot.currentHeartRate(nowMonoNs = 9 + HR_STALE_NS))
+    }
+
+    @Test
     fun aSnapshotDoesNotChangeWhenMoreSamplesArrive() {
         val model = MonitorModel()
         model.feed(EcgRecord(0, 1, listOf(1, 2), listOf(1, 2)))

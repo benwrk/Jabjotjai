@@ -7,12 +7,6 @@ package com.benwrk.jabjotjai.monitor
  */
 object Sweep {
 
-    /** The conventional ECG paper speed. */
-    const val MM_PER_SECOND: Float = 25f
-
-    /** The conventional ECG gain: 10 mm per millivolt. */
-    const val MM_PER_MICROVOLT: Float = 10f / 1000f
-
     /**
      * How far behind the newest sample the cursor runs. Frames arrive in bursts, so drawing each
      * burst at its arrival would jump; running a little behind lets samples be revealed at the pace
@@ -23,8 +17,8 @@ object Sweep {
     /** Consecutive samples further apart than this are not joined: a gap is drawn as a break. */
     const val MAX_JOIN_NS: Long = 100_000_000L
 
-    /** How long a sweep across [widthMm] lasts at [MM_PER_SECOND]. */
-    fun windowNs(widthMm: Float): Long = (widthMm.toDouble() / MM_PER_SECOND * 1e9).toLong()
+    /** How long a sweep across [widthMm] lasts at [mmPerSecond]. */
+    fun windowNs(widthMm: Float, mmPerSecond: Float): Long = (widthMm.toDouble() / mmPerSecond * 1e9).toLong()
 
     /**
      * The sensor time the cursor is at: the newest sample's time plus the time elapsed since its

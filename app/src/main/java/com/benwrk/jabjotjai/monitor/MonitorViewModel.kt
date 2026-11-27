@@ -34,6 +34,16 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     private val mutableReadError = MutableStateFlow<String?>(null)
     val readError: StateFlow<String?> = mutableReadError.asStateFlow()
 
+    private val settingsStore = DisplaySettingsStore(application)
+    private val mutableDisplaySettings = MutableStateFlow(settingsStore.load())
+    val displaySettings: StateFlow<DisplaySettings> = mutableDisplaySettings.asStateFlow()
+
+    fun updateDisplaySettings(change: (DisplaySettings) -> DisplaySettings) {
+        val updated = change(mutableDisplaySettings.value)
+        mutableDisplaySettings.value = updated
+        settingsStore.save(updated)
+    }
+
     init {
         viewModelScope.launch {
             Capture.state

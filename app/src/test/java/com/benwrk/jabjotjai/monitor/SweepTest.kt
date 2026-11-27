@@ -54,7 +54,13 @@ class SweepTest {
     }
 
     @Test
-    fun aSweepAcross150MillimetresLastsSixSeconds() {
-        assertEquals(6_000_000_000L, Sweep.windowNs(150f))
+    fun aSweepAcross150MillimetresLastsSixSecondsAt25AndThreeAt50() {
+        assertEquals(6_000_000_000L, Sweep.windowNs(150f, mmPerSecond = 25f))
+        assertEquals(3_000_000_000L, Sweep.windowNs(150f, mmPerSecond = 50f))
+    }
+
+    @Test
+    fun theSlowestSweepAcrossALargeTabletFitsInWhatTheModelKeeps() {
+        assertEquals(true, Sweep.windowNs(250f, SweepSpeed.MM_6_25.mmPerSecond) <= MonitorModel.DEFAULT_KEEP_NS)
     }
 }

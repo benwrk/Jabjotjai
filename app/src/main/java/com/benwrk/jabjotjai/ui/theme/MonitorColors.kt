@@ -17,4 +17,10 @@ object MonitorColors {
     val Divider = Color(0xFF262626)
     val Warning = Color(0xFFFFB020)
     val Alarm = Color(0xFFFF3B30)
+
+    /**
+     * A stretch of trace cut off at the band's edge. White, because the warning amber is too close
+     * to the accelerometer's yellow X to tell apart on the same band.
+     */
+    val Clipped = Color(0xFFFFFFFF)
 }
