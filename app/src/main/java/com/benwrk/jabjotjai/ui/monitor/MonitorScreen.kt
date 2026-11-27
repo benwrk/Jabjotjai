@@ -58,6 +58,7 @@ import com.benwrk.jabjotjai.capture.Capture
 import com.benwrk.jabjotjai.capture.CaptureState
 import com.benwrk.jabjotjai.monitor.AutoScale
 import com.benwrk.jabjotjai.monitor.BandScale
+import com.benwrk.jabjotjai.monitor.ChartGraph
 import com.benwrk.jabjotjai.monitor.DisplaySettings
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
@@ -199,7 +200,8 @@ private class Bands(
 
 /**
  * The chart: its graphs top to bottom (see [chartGraphs]), each as tall as its rows. Each signal's
- * automatic scale fits its shortest graph, so the trace fits in every graph of it.
+ * automatic scale fits its shortest graph, so the trace fits in every graph of it. A cascade's
+ * label and calibration pulse are drawn once, on its top graph, where its strip starts.
  */
 @Composable
 private fun Waveforms(bands: Bands, modifier: Modifier) {
@@ -213,11 +215,11 @@ private fun Waveforms(bands: Bands, modifier: Modifier) {
                     graphs.indices.filter { graphs[it].signal == graph.signal }.minOf { heightsMm[it] ?: Float.MAX_VALUE }
             }
             when (graph.signal) {
-                RowSignal.ECG -> EcgBand(bands, graph.sweepsBack, graphModifier)
-                RowSignal.ACC -> AccBand(bands, ACC_AXES, bands.scales.getValue(RowSignal.ACC), graph.sweepsBack, graphModifier)
+                RowSignal.ECG -> EcgBand(bands, graph, graphModifier)
+                RowSignal.ACC -> AccBand(bands, ACC_AXES, bands.scales.getValue(RowSignal.ACC), graph, graphModifier)
                 else -> {
                     val axis = ACC_AXES.first { it.signal == graph.signal }
-                    AccBand(bands, listOf(axis), bands.scales.getValue(axis.signal), graph.sweepsBack, graphModifier)
+                    AccBand(bands, listOf(axis), bands.scales.getValue(axis.signal), graph, graphModifier)
                 }
             }
         }
@@ -225,7 +227,7 @@ private fun Waveforms(bands: Bands, modifier: Modifier) {
 }
 
 @Composable
-private fun EcgBand(bands: Bands, sweepsBack: Int, modifier: Modifier) {
+private fun EcgBand(bands: Bands, graph: ChartGraph, modifier: Modifier) {
     val scale = bands.ecgScale.value
     val gain = ScaleLadder.ECG.mmPerUnit(scale.index)
     val label = stringResource(
@@ -234,7 +236,7 @@ private fun EcgBand(bands: Bands, sweepsBack: Int, modifier: Modifier) {
         plainNumber(gain),
         plainNumber(bands.settings.value.sweep.mmPerSecond),
     ) + if (bands.settings.value.ecgAuto) " " + stringResource(R.string.monitor_auto) else ""
-    Band(label = { Text(label, color = MonitorColors.Ecg, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
+    Band(label = { if (graph.cascadeIndex == 0) Text(label, color = MonitorColors.Ecg, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
         SweepTrace(
             snapshot = bands.snapshot,
             nowMonoNs = bands.frameClock,
@@ -244,10 +246,11 @@ private fun EcgBand(bands: Bands, sweepsBack: Int, modifier: Modifier) {
             pxPerMm = bands.pxPerMm,
             mmPerSecond = bands.mmPerSecond,
             offsetPx = bandOffset(ScaleLadder.ECG, bands.ecgScale, bands.pxPerMm),
-            sweepsBack = sweepsBack,
+            cascadeIndex = graph.cascadeIndex,
+            cascadeSize = graph.cascadeSize,
             modifier = Modifier.fillMaxSize(),
         )
-        if (bands.settings.value.calibrationPulse) CalibrationPulse(bands, Modifier.fillMaxSize())
+        if (bands.settings.value.calibrationPulse && graph.cascadeIndex == 0) CalibrationPulse(bands, Modifier.fillMaxSize())
     }
 }
 
@@ -256,7 +259,7 @@ private fun EcgBand(bands: Bands, sweepsBack: Int, modifier: Modifier) {
  * its true level (gravity included) relative to the others, and one axis alone is centred on its own.
  */
 @Composable
-private fun AccBand(bands: Bands, axes: List<AccAxis>, bandScale: State<BandScale>, sweepsBack: Int, modifier: Modifier) {
+private fun AccBand(bands: Bands, axes: List<AccAxis>, bandScale: State<BandScale>, graph: ChartGraph, modifier: Modifier) {
     val scale = bandScale.value
     val title = stringResource(R.string.monitor_acc_label)
     val scaleText = stringResource(R.string.monitor_acc_scale, plainNumber(ScaleLadder.ACC.mmPerUnit(scale.index))) +
@@ -269,7 +272,7 @@ private fun AccBand(bands: Bands, axes: List<AccAxis>, bandScale: State<BandScal
         }
         withStyle(SpanStyle(color = MonitorColors.Text)) { append(" $scaleText") }
     }
-    Band(label = { Text(label, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
+    Band(label = { if (graph.cascadeIndex == 0) Text(label, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
         val offset = bandOffset(ScaleLadder.ACC, bandScale, bands.pxPerMm)
         for (axis in axes) {
             SweepTrace(
@@ -281,7 +284,8 @@ private fun AccBand(bands: Bands, axes: List<AccAxis>, bandScale: State<BandScal
                 pxPerMm = bands.pxPerMm,
                 mmPerSecond = bands.mmPerSecond,
                 offsetPx = offset,
-                sweepsBack = sweepsBack,
+                cascadeIndex = graph.cascadeIndex,
+                cascadeSize = graph.cascadeSize,
                 modifier = Modifier.fillMaxSize(),
             )
         }

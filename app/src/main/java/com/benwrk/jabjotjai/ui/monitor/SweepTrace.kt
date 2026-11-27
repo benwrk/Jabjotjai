@@ -26,7 +26,8 @@ import com.benwrk.jabjotjai.ui.theme.MonitorColors
  *
  * @param mmPerSecond the sweep speed, read while drawing
  * @param offsetPx how far above the band's centre a sample value is drawn
- * @param sweepsBack how many whole sweeps before now to show, for a cascaded graph
+ * @param cascadeIndex this graph's place in its cascade, from 0 at the top
+ * @param cascadeSize how many graphs the cascade folds one sweep across; 1 without a cascade
  */
 @Composable
 fun SweepTrace(
@@ -38,7 +39,8 @@ fun SweepTrace(
     pxPerMm: Float,
     mmPerSecond: () -> Float,
     offsetPx: (value: Int) -> Float,
-    sweepsBack: Int = 0,
+    cascadeIndex: Int = 0,
+    cascadeSize: Int = 1,
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier) {
@@ -47,22 +49,34 @@ fun SweepTrace(
         val samples = trace(current)
         if (samples.size == 0 || size.width <= 0f) return@Canvas
 
-        val windowNs = Sweep.windowNs(size.width / pxPerMm, mmPerSecond())
-        // A cascaded graph shows whole sweeps back, so its samples fall where they did a sweep ago.
-        val cursorNs = Sweep.cursorNs(frameTiming, nowMonoNs.value) - sweepsBack * windowNs
+        // One graph's width of time; a cascade is one sweep that many graphs long (see Sweep.cascadeAcross).
+        val rowWindowNs = Sweep.windowNs(size.width / pxPerMm, mmPerSecond())
+        val windowNs = rowWindowNs * cascadeSize
+        val cursorNs = Sweep.cursorNs(frameTiming, nowMonoNs.value)
         val half = size.height / 2f
         val path = Path()
         val clipped = Path()
         val dotPx = 1.dp.toPx()
-        for (run in Sweep.runs(samples.tNs, cursorNs, windowNs, eraseNs = windowNs / ERASE_FRACTION)) {
+        for (run in Sweep.runs(samples.tNs, cursorNs, windowNs, eraseNs = rowWindowNs / ERASE_FRACTION)) {
             var clipStartX = Float.NaN
             var clipEdgeY = Float.NaN
             var lastX = 0f
+            var drawing = false
             for (i in run) {
-                val x = Sweep.xFraction(samples.tNs[i], windowNs) * size.width
+                val along = Sweep.cascadeAcross(samples.tNs[i], rowWindowNs, cascadeSize)
+                val row = along.toInt().coerceAtMost(cascadeSize - 1)
+                if (row != cascadeIndex) {
+                    // In another graph of the cascade: end this stretch here.
+                    if (!clipEdgeY.isNaN()) clipped.edge(clipStartX, lastX, clipEdgeY, dotPx)
+                    clipEdgeY = Float.NaN
+                    drawing = false
+                    continue
+                }
+                val x = (along - row) * size.width
                 val unclipped = half - offsetPx(samples.values[i])
                 val y = unclipped.coerceIn(0f, size.height)
-                if (i == run.first) path.moveTo(x, y) else path.lineTo(x, y)
+                if (drawing) path.lineTo(x, y) else path.moveTo(x, y)
+                drawing = true
 
                 val edge = if (unclipped != y) y else Float.NaN
                 if (edge != clipEdgeY && !clipEdgeY.isNaN()) clipped.edge(clipStartX, lastX, clipEdgeY, dotPx)

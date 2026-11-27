@@ -19,10 +19,11 @@ data class ChartRow(val signal: RowSignal, val joinedAbove: Boolean = false)
 
 /**
  * One graph of the chart, [rows] tall. Graphs of one signal next to each other that are not joined
- * make a cascade, as on a bedside monitor: each carries the trace on from the graph above, so the
- * last shows the newest sweep and the one [sweepsBack] above it the sweep before that, and so on.
+ * make a cascade, as on a bedside monitor: one sweep [cascadeSize] graphs long, folded across them
+ * top to bottom, so the trace runs on from each graph into the next and one cursor moves through
+ * them all. This graph is number [cascadeIndex] of its cascade, from 0 at the top.
  */
-data class ChartGraph(val signal: RowSignal, val rows: Int, val sweepsBack: Int)
+data class ChartGraph(val signal: RowSignal, val rows: Int, val cascadeIndex: Int = 0, val cascadeSize: Int = 1)
 
 /** The graphs [rows] make: joined rows merged, unjoined neighbours of one signal cascaded. */
 fun chartGraphs(rows: List<ChartRow>): List<ChartGraph> {
@@ -37,12 +38,12 @@ fun chartGraphs(rows: List<ChartRow>): List<ChartGraph> {
         }
     }
     return runs.flatMap { (signal, heights) ->
-        heights.mapIndexed { index, rows -> ChartGraph(signal, rows, sweepsBack = heights.lastIndex - index) }
+        heights.mapIndexed { index, rows -> ChartGraph(signal, rows, cascadeIndex = index, cascadeSize = heights.size) }
     }
 }
 
-/** The most sweeps back any graph of [graphs] shows, so the model can keep that much. */
-fun deepestCascade(graphs: List<ChartGraph>): Int = graphs.maxOfOrNull { it.sweepsBack } ?: 0
+/** The most sweeps any cascade of [graphs] spans, so the model can keep that much. */
+fun longestCascade(graphs: List<ChartGraph>): Int = graphs.maxOfOrNull { it.cascadeSize } ?: 1
 
 /** The layout 0.3 had: one ECG row above one accelerometer row. */
 val DEFAULT_CHART_ROWS = listOf(ChartRow(RowSignal.ECG), ChartRow(RowSignal.ACC))

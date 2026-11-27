@@ -136,8 +136,10 @@ The current scope.
    ECG, the accelerometer with X, Y and Z together, one accelerometer axis, heart rate, or RR
    interval. Signals added later, such as HRV, join the same list.
 2. **Neighbouring rows of the same signal are joined or cascaded.** Joined rows are one graph as
-   tall as the rows together. Cascaded rows carry the trace on from the row above, so two ECG rows
-   show twice as many seconds, the newest at the bottom, as a bedside monitor's cascaded ECG does.
+   tall as the rows together. Cascaded rows are one sweep folded across them, as a bedside
+   monitor's cascaded ECG is: the trace runs across the top row and on into the next, with one
+   cursor, so two ECG rows show twice as many seconds. A cascade's label and calibration pulse are
+   shown once, on its top row.
 3. **Heart-rate and RR rows** plot the values the strap reported, on the same time axis as the
    waveforms, each with its own scale.
 4. **The choices are kept between runs.** The default is the layout 0.3 has: one ECG row above one

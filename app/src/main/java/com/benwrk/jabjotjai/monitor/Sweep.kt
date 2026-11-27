@@ -31,6 +31,15 @@ object Sweep {
     fun xFraction(tNs: Long, windowNs: Long): Float = Math.floorMod(tNs, windowNs).toFloat() / windowNs
 
     /**
+     * Where a sample at [tNs] falls in a cascade of [rows] rows, each [rowWindowNs] wide: one sweep
+     * [rows] times as long, folded into rows top to bottom, as a bedside monitor cascades its ECG.
+     * How far along the cascade it is, in rows, from 0 to just under [rows]: its whole part is the
+     * row, from 0 at the top, and the rest how far across that row. A single number, so drawing
+     * thousands of samples a frame allocates nothing.
+     */
+    fun cascadeAcross(tNs: Long, rowWindowNs: Long, rows: Int): Float = xFraction(tNs, rowWindowNs * rows) * rows
+
+    /**
      * The index ranges of [tNs] (oldest first) to draw as connected lines: samples after the
      * cursor's erase gap and up to the cursor, split wherever the sweep wraps to the left edge and
      * wherever consecutive samples are more than [maxJoinNs] apart.

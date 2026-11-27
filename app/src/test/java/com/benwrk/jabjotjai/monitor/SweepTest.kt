@@ -63,4 +63,17 @@ class SweepTest {
     fun theSlowestSweepAcrossALargeTabletFitsInWhatTheModelKeeps() {
         assertEquals(true, Sweep.windowNs(250f, SweepSpeed.MM_6_25.mmPerSecond) <= MonitorModel.DEFAULT_KEEP_NS)
     }
+
+    @Test
+    fun aCascadeFoldsOneLongSweepIntoRowsTopToBottom() {
+        val rowNs = 10L
+        // Halfway across the first, second and third row of three.
+        assertEquals(0.5f, Sweep.cascadeAcross(5, rowNs, rows = 3), 1e-4f)
+        assertEquals(1.5f, Sweep.cascadeAcross(15, rowNs, rows = 3), 1e-4f)
+        assertEquals(2.5f, Sweep.cascadeAcross(25, rowNs, rows = 3), 1e-4f)
+        // After the bottom row the sweep goes back to the top.
+        assertEquals(0.5f, Sweep.cascadeAcross(35, rowNs, rows = 3), 1e-4f)
+        // One row is the ordinary sweep.
+        assertEquals(0.5f, Sweep.cascadeAcross(15, rowNs, rows = 1), 1e-4f)
+    }
 }

@@ -69,11 +69,11 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     val displaySettings: StateFlow<DisplaySettings> = DisplaySettingsStore.settings
 
     /**
-     * How many sweeps of history the chart needs: one, and one more for each sweep the deepest
-     * cascade looks back. The model keeps, and the readers read, [MonitorModel.DEFAULT_KEEP_NS] for
+     * How many sweeps of history the chart needs: as many as its longest cascade spans; one without
+     * a cascade. The model keeps, and the readers read, [MonitorModel.DEFAULT_KEEP_NS] for
      * each, which holds a whole sweep even at the slowest speed.
      */
-    private val sweepsKept = DisplaySettingsStore.settings.map { deepestCascade(chartGraphs(it.rows)) + 1 }.distinctUntilChanged()
+    private val sweepsKept = DisplaySettingsStore.settings.map { longestCascade(chartGraphs(it.rows)) }.distinctUntilChanged()
 
     fun updateDisplaySettings(change: (DisplaySettings) -> DisplaySettings) = DisplaySettingsStore.update(change)
 
