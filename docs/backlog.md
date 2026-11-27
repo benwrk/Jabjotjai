@@ -48,11 +48,13 @@ the offer to resume appeared after a capture was left unfinished. Not yet seen:
   which the documentation does not say (decision `0013`).
 - **Force stop**: the capture must not resume by itself, and the offer must appear on next open.
 - **Swiping the app away** from recent apps must not stop a capture.
-- **The first update test resumed nothing.** The app was on screen, Android reopened it, and its
-  picker wrote the note and showed the offer, but the update receiver left no sign it ran. That
-  build did not log from the receiver; the receiver has logged since, and both later updates
-  resumed. Mechanism unconfirmed: repeat an update with the monitor on screen and read
-  `UpdateReceiver` in logcat.
+- **An update while the app is on screen does not resume by itself.** Seen twice on 2026-11-27:
+  Android restarted the app for its on-screen activity before sending the update broadcast, and
+  `adb shell dumpsys activity broadcasts history` lists `MY_PACKAGE_REPLACED` to `UpdateReceiver`
+  as SKIPPED, reason `mBroadcastConsumerSkip`; the picker then wrote the ending note and offered
+  to resume. With the app off screen the broadcast was delivered and the capture resumed, five
+  times. Mechanism unconfirmed: find what skips it, in the platform source or upstream, then
+  decide whether the app should resume by itself an update it finds just after one.
 
 Done when each has been seen on the test phone, with the date, and the raw files checked.
 
