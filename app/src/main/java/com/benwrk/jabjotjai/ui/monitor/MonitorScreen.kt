@@ -51,6 +51,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -207,7 +208,19 @@ private fun StatusBar(snapshot: MonitorSnapshot, running: CaptureState.Running, 
         Text(running.sensorName, color = MonitorColors.Text, style = MaterialTheme.typography.titleSmall)
         Text(connection, color = connectionColor, style = MaterialTheme.typography.titleSmall)
         Text(elapsedText(snapshot.elapsedSeconds(nowMonoNs) ?: 0), color = MonitorColors.Secondary, fontFamily = FontFamily.Monospace)
-        Spacer(Modifier.weight(1f))
+        // Battery optimisation may refuse the restart that resumes a capture Android stopped
+        // (decision 0013); said here, in the room the status bar has spare, so it can be turned off
+        // before a night's recording.
+        val context = LocalContext.current
+        val optimised = !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+        Text(
+            if (optimised) stringResource(R.string.monitor_battery_optimised) else "",
+            color = MonitorColors.Warning,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
         OutlinedButton(onClick = onStop, border = BorderStroke(1.dp, MonitorColors.Alarm)) {
             Text(stringResource(R.string.stop), color = MonitorColors.Alarm)
         }
@@ -419,12 +432,6 @@ private fun Details(heartRate: HeartRate?, snapshot: MonitorSnapshot, beepError:
         )
         Text(stringResource(R.string.monitor_gaps, snapshot.gaps), color = if (snapshot.gaps > 0) MonitorColors.Warning else MonitorColors.Secondary)
         beepError?.let { Text(stringResource(R.string.monitor_beep_unavailable, it), color = MonitorColors.Warning) }
-        // Battery optimisation may refuse the restart that resumes a capture Android stopped
-        // (decision 0013); said here so it can be turned off before a night's recording.
-        val context = LocalContext.current
-        if (!context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)) {
-            Text(stringResource(R.string.monitor_battery_optimised), color = MonitorColors.Warning)
-        }
     }
 }
 
