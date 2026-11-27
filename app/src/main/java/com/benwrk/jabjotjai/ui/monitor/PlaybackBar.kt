@@ -1,11 +1,12 @@
 package com.benwrk.jabjotjai.ui.monitor
 
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,7 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -146,7 +150,7 @@ fun PlaybackBar(
                     )
                 }
                 LiveButton(live, onLive)
-                Spacer(Modifier.weight(1f))
+                Credit(Modifier.weight(1f))
                 BeepVolume(settings, onSettings)
                 SpeedButton(playback, onSpeed)
                 SmallIconButton(R.drawable.ic_settings, stringResource(R.string.display_open), onOpenSettings)
@@ -318,3 +322,34 @@ private fun JumpButton(icon: Int, description: String, enabled: Boolean, onClick
 /** Room for the times up to 99 hours, with the minus of a time behind live, and for "0.5×". */
 private const val TIME_CELLS = 9
 private const val SPEED_CELLS = 4
+
+/**
+ * The credit, as one line: the app's name, its version and its author, then where it was made
+ * (decision 0018). It is small and very faint, in the space between LIVE and the volume, and only
+ * where it fits whole with room either side; otherwise the space stays empty. The version is read
+ * from the installed app, so it is the one running.
+ */
+@Composable
+private fun Credit(modifier: Modifier) {
+    val context = LocalContext.current
+    val version = remember(context) {
+        context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0)).versionName.orEmpty()
+    }
+    val text = stringResource(R.string.credit, stringResource(R.string.app_name), version)
+    val style = MaterialTheme.typography.labelSmall.copy(color = MonitorColors.Secondary.copy(alpha = CREDIT_ALPHA), fontSize = CREDIT_FONT_SIZE)
+    val measurer = rememberTextMeasurer()
+    val width = remember(text, style) { measurer.measure(text, style).size.width }
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val room = constraints.maxWidth - with(LocalDensity.current) { (CREDIT_MARGIN * 2).roundToPx() }
+        if (width <= room) Text(text, style = style, maxLines = 1)
+    }
+}
+
+/** How strongly the credit is drawn, against the secondary text colour. */
+private const val CREDIT_ALPHA = 0.35f
+
+/** The credit's size, smaller than the smallest of Material's label styles. */
+private val CREDIT_FONT_SIZE = 9.sp
+
+/** The least room either side of the credit. */
+private val CREDIT_MARGIN = 16.dp
