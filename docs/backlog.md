@@ -58,6 +58,19 @@ the offer to resume appeared after a capture was left unfinished. Not yet seen:
 
 Done when each has been seen on the test phone, with the date, and the raw files checked.
 
+## Decide whether the capture notification shows icons
+
+Icons for RR, gaps, battery and contact in the notification need a custom layout, and Android
+treats a notification as a Live Update only if it has no custom views
+(`Notification.hasPromotableCharacteristics`, SDK 37 source, read 2026-11-27). On the test phone
+(Galaxy S25, One UI 9) promotion kept the notification open in the shade with Stop showing, where
+without it One UI folded it to one line; it drew no status-bar chip and did not keep it first
+(seen 2026-11-27). Unknown: what promotion does on other phones, and whether one row of icons fits
+the folded custom view.
+
+Done when the folded and open views of a custom layout have been seen on the test phone beside
+the current notification, and the owner has chosen one.
+
 ## Prove a capture survives 30 minutes on battery with the screen off
 
 `docs/spec.md` 0.1 item 4, staying connected in the background, is the one 0.1 requirement not
