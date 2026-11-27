@@ -38,25 +38,31 @@ as a switch in a shipped build (`AGENTS.md`); and a decision records the approac
 
 ## Finish proving 0.3 on the test phone
 
-Seen working on 2026-11-27: an update during a capture resumed it into a new file whose header
-names the old one, and wrote the old one's ending note with reason `PACKAGE_UPDATED`, twice; and
-the offer to resume appeared after a capture was left unfinished. Not yet seen:
+Seen working on 2026-11-27: an update during a capture, with the app off screen, resumed it into a
+new file whose header names the old one and wrote the old one's ending note with reason
+`PACKAGE_UPDATED`, every time; the offer to resume appeared after a capture was left unfinished;
+and swiping the app away from recent apps left the capture running (the same process and file,
+129 lines and 15 heart rates in the next 15 s, no `end` record). Not yet as specified:
 
-- **A kill that Android restarts** (`START_STICKY`): kill the app's process during a capture,
-  for example with `adb shell run-as com.benwrk.jabjotjai kill -9 <pid>`, and see whether the
-  service is re-created and allowed to start in the foreground with battery optimisation on,
-  which the documentation does not say (decision `0013`).
-- **Force stop**: the capture must not resume by itself, and the offer must appear on next open.
-- **Swiping the app away** from recent apps must not stop a capture.
+- **A kill that Android restarts did not restart.** The capture's process was killed with
+  `adb shell run-as com.benwrk.jabjotjai kill -9 <pid>` (battery optimisation on). The event log
+  has `am_proc_died` and no `am_schedule_service_restart`; three and a half minutes later the
+  service record was still there with `app=null`, `startRequested=true`, `isForeground=true`, and
+  nothing had restarted it. Opening the app then wrote the ending note with reason `SIGNALED`.
+  Mechanism unconfirmed: whether a kill from the app's own user, rather than the low-memory
+  killer, is why no restart was scheduled, or One UI's battery management.
+- **The dead capture's notification stayed up**, with the heart rate it last showed, for as long
+  as the service record waited, so the phone looked as if it was still capturing.
+- **Force stop**: not tried; the phone was locked after the kill, and it needs a running capture
+  and the offer to answer.
 - **An update while the app is on screen does not resume by itself.** Seen twice on 2026-11-27:
   Android restarted the app for its on-screen activity before sending the update broadcast, and
   `adb shell dumpsys activity broadcasts history` lists `MY_PACKAGE_REPLACED` to `UpdateReceiver`
   as SKIPPED, reason `mBroadcastConsumerSkip`; the picker then wrote the ending note and offered
-  to resume. With the app off screen the broadcast was delivered and the capture resumed, five
-  times. Mechanism unconfirmed: find what skips it, in the platform source or upstream, then
-  decide whether the app should resume by itself an update it finds just after one.
+  to resume. Mechanism unconfirmed.
 
-Done when each has been seen on the test phone, with the date, and the raw files checked.
+Done when each has been seen on the test phone, with the date, and the raw files checked, or the
+spec changed to say what happens instead.
 
 ## Decide whether the capture notification shows icons
 
