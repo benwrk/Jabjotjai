@@ -111,6 +111,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
     /** The playback before the current drag began, or null when not dragging. */
     private var beforeScrub: Playback? = null
+    private var lastScrubRestartNs = 0L
 
     /**
      * Shows [targetNs] while the timeline is being dragged: paused there, read with only a short
@@ -122,6 +123,9 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         val before = beforeScrub ?: mutablePlayback.value.also { beforeScrub = it }
         val now = nowNs()
         mutablePlayback.value = Playback.Past(targetNs.coerceIn(start, now), now, before.speed, paused = true)
+        // At most one restart every SCRUB_RESTART_NS, so each read has time to finish and show.
+        if (now - lastScrubRestartNs < SCRUB_RESTART_NS) return
+        lastScrubRestartNs = now
         replayStart.value++
     }
 
@@ -183,7 +187,8 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         val model = MonitorModel()
         model.setHeader(header)
         model.startFrom(if (mark == null) CaptureStateAt.INITIAL else timeline.stateAt(mark.monoNs - 1))
-        mutableReplay.value = model.snapshot()
+        // While dragging, the last moment shown stays up until this read has something to show.
+        if (beforeScrub == null) mutableReplay.value = model.snapshot()
         val start = if (mark == null) RawTail.Start.Beginning else RawTail.Start.At(mark.offset)
         try {
             RawTail(file).linesWithOffsets(start).collect { (_, line) ->
@@ -234,6 +239,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
         /** While dragging: about one sweep across a phone at the slower speeds, so each step reads little. */
         const val SCRUB_LEAD_NS = 10_000_000_000L
+        const val SCRUB_RESTART_NS = 120_000_000L
 
         const val MAX_WAIT_MS = 50L
         const val CATCH_UP_CHECK_MS = 200L
