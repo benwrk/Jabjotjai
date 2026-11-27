@@ -57,6 +57,15 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     /** In the past: everything, as of the playhead. */
     val replay: StateFlow<MonitorSnapshot> = mutableReplay.asStateFlow()
 
+    private val mutableReplayReady = MutableStateFlow(false)
+
+    /**
+     * Whether [replay] holds the moment shown. Not yet, just after leaving live: the past reader is
+     * still reading up to the playhead, and the live readings still hold that moment, so the screen
+     * draws those until then rather than nothing.
+     */
+    val replayReady: StateFlow<Boolean> = mutableReplayReady.asStateFlow()
+
     private val mutablePlayback = MutableStateFlow<Playback>(Playback.Live)
     val playback: StateFlow<Playback> = mutablePlayback.asStateFlow()
 
@@ -163,20 +172,27 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     /** Moves the playhead [byNs] from where it is, back if negative; see [Playback.jump]. */
     fun jump(byNs: Long) {
         val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
-        mutablePlayback.value = mutablePlayback.value.jump(byNs, start, nowNs())
-        replayStart.value++
+        val before = mutablePlayback.value
+        mutablePlayback.value = before.jump(byNs, start, nowNs())
+        if (before is Playback.Live) leaveLive() else replayStart.value++
     }
 
     fun setSpeed(speed: Float) {
         val before = mutablePlayback.value
         mutablePlayback.value = before.withSpeed(speed, nowNs())
-        if (before is Playback.Live && mutablePlayback.value is Playback.Past) replayStart.value++
+        if (before is Playback.Live && mutablePlayback.value is Playback.Past) leaveLive()
     }
 
     fun togglePause() {
         val before = mutablePlayback.value
         mutablePlayback.value = before.togglePause(nowNs())
-        if (before is Playback.Live) replayStart.value++
+        if (before is Playback.Live) leaveLive()
+    }
+
+    /** Starts the past reader, with the live readings on screen until it reaches the playhead. */
+    private fun leaveLive() {
+        mutableReplayReady.value = false
+        replayStart.value++
     }
 
     fun goLive() {
@@ -207,12 +223,13 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun replay(file: File) {
         val sweeps = sweepsKept.first()
         val (model, start) = modelFrom(mutablePlayback.value.positionNs(nowNs()) - REPLAY_LEAD_NS * sweeps, sweeps) ?: return
-        mutableReplay.value = model.snapshot()
+        // Nothing is published until the read reaches the playhead: the screen keeps what it shows.
         reportingReadErrors {
             RawTail(file).linesWithOffsets(start).collect { (_, line) ->
                 val time = (line as? RawLine.Record)?.record?.timeMonoNs()
                 if (time != null && time > mutablePlayback.value.positionNs(nowNs())) {
                     mutableReplay.value = model.snapshot()
+                    mutableReplayReady.value = true
                     awaitPlayhead(time)
                 }
                 model.accept(line)
@@ -235,6 +252,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
             // A drag that ended while this read ran has already set where the playhead goes.
             if (beforeScrub == null) return@reportingReadErrors
             mutableReplay.value = model.snapshot()
+            mutableReplayReady.value = true
             val now = nowNs()
             mutablePlayback.value = Playback.Past(targetNs, now, mutablePlayback.value.speed, paused = true)
         }

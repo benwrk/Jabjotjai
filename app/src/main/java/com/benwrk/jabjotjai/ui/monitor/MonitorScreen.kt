@@ -98,6 +98,7 @@ fun MonitorScreen(
     val liveWaves = viewModel.snapshot.collectAsState()
     val live = viewModel.live.collectAsState()
     val replay = viewModel.replay.collectAsState()
+    val replayReady = viewModel.replayReady.collectAsState()
     val playback = viewModel.playback.collectAsState()
     val readError by viewModel.readError.collectAsState()
     val beepError by Capture.beepError.collectAsState()
@@ -110,8 +111,10 @@ fun MonitorScreen(
     // What is drawn follows the playhead: the live readers at live, the past reader otherwise.
     // derivedStateOf makes these states that change only when their source does.
     val displayClock = remember { derivedStateOf { playback.value.positionNs(frameClock.value) } }
-    val waves = remember { derivedStateOf { if (playback.value is Playback.Live) liveWaves.value else replay.value } }
-    val vitals = remember { derivedStateOf { if (playback.value is Playback.Live) live.value.snapshot else replay.value } }
+    // Just after leaving live, the live readings hold the moment until the past reader has it.
+    val showLive = remember { derivedStateOf { playback.value is Playback.Live || !replayReady.value } }
+    val waves = remember { derivedStateOf { if (showLive.value) liveWaves.value else replay.value } }
+    val vitals = remember { derivedStateOf { if (showLive.value) live.value.snapshot else replay.value } }
 
     // The height of each signal's shortest graph, which its automatic scale fits the trace to.
     val bandMm = remember { RowSignal.entries.associateWith { mutableFloatStateOf(0f) } }
