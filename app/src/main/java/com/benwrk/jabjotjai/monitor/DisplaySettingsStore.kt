@@ -1,6 +1,8 @@
 package com.benwrk.jabjotjai.monitor
 
 import android.content.Context
+import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,26 +32,30 @@ object DisplaySettingsStore {
     private val mutableSettings = MutableStateFlow(DisplaySettings())
     val settings: StateFlow<DisplaySettings> = mutableSettings.asStateFlow()
 
-    private var context: Context? = null
+    /**
+     * Where the settings are kept, once [init] has run. The preferences themselves are held rather
+     * than a context, which is all they were needed for.
+     */
+    private var prefs: SharedPreferences? = null
 
     /** Loads the saved settings, once per process; later calls do nothing. */
     @Synchronized
     fun init(context: Context) {
-        if (this.context != null) return
-        this.context = context.applicationContext
-        mutableSettings.value = load(context.applicationContext)
+        if (prefs != null) return
+        val opened = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        prefs = opened
+        mutableSettings.value = load(opened)
     }
 
     @Synchronized
     fun update(change: (DisplaySettings) -> DisplaySettings) {
         val updated = change(mutableSettings.value)
         mutableSettings.value = updated
-        context?.let { save(it, updated) }
+        prefs?.let { save(it, updated) }
     }
 
     /** The saved settings; anything missing or no longer valid falls back to its default. */
-    private fun load(context: Context): DisplaySettings {
-        val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    private fun load(prefs: SharedPreferences): DisplaySettings {
         val defaults = DisplaySettings()
         val sweep = SweepSpeed.entries.firstOrNull { it.name == prefs.getString(SWEEP, null) } ?: defaults.sweep
         return DisplaySettings(
@@ -68,19 +74,19 @@ object DisplaySettingsStore {
         )
     }
 
-    private fun save(context: Context, settings: DisplaySettings) {
-        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-            .putString(SWEEP, settings.sweep.name)
-            .putBoolean(ECG_AUTO, settings.ecgAuto)
-            .putInt(ECG_GAIN, settings.ecgGainIndex)
-            .putBoolean(ACC_AUTO, settings.accAuto)
-            .putInt(ACC_SCALE, settings.accScaleIndex)
-            .putBoolean(CALIBRATION_PULSE, settings.calibrationPulse)
-            .putBoolean(BEEP, settings.beep)
-            .putBoolean(BEEP_IN_BACKGROUND, settings.beepInBackground)
-            .putFloat(BEEP_VOLUME, settings.beepVolume)
-            .putBoolean(TIME_FROM_START, settings.timeFromStart)
-            .putString(CHART_ROWS, encodeChartRows(settings.rows))
-            .apply()
+    private fun save(prefs: SharedPreferences, settings: DisplaySettings) {
+        prefs.edit {
+            putString(SWEEP, settings.sweep.name)
+                .putBoolean(ECG_AUTO, settings.ecgAuto)
+                .putInt(ECG_GAIN, settings.ecgGainIndex)
+                .putBoolean(ACC_AUTO, settings.accAuto)
+                .putInt(ACC_SCALE, settings.accScaleIndex)
+                .putBoolean(CALIBRATION_PULSE, settings.calibrationPulse)
+                .putBoolean(BEEP, settings.beep)
+                .putBoolean(BEEP_IN_BACKGROUND, settings.beepInBackground)
+                .putFloat(BEEP_VOLUME, settings.beepVolume)
+                .putBoolean(TIME_FROM_START, settings.timeFromStart)
+                .putString(CHART_ROWS, encodeChartRows(settings.rows))
+        }
     }
 }
