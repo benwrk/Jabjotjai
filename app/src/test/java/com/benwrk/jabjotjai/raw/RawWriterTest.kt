@@ -6,6 +6,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 
 class RawWriterTest {
@@ -27,6 +28,49 @@ class RawWriterTest {
                 file.readText(),
             )
         }
+    }
+
+    /** Writes the first [stored] bytes of the next line it is given, then fails, as a full disk can. */
+    private class FailingOnce(private val stored: Int) {
+        var armed = false
+
+        fun write(out: FileOutputStream, bytes: ByteArray) {
+            if (!armed) return out.write(bytes)
+            armed = false
+            out.write(bytes, 0, stored)
+            throw IOException("No space left on device")
+        }
+    }
+
+    @Test
+    fun aWriteThatFailsPartWayIsEndedSoTheNextRecordStartsALineOfItsOwn() {
+        val file = newFile()
+        val failing = FailingOnce(stored = 10)
+        RawWriter.createWithSync(file, monoNs = { 0L }, syncIntervalNs = 0, writeBytes = failing::write) {}.use { writer ->
+            writer.write(Samples.header)
+            failing.armed = true
+            assertThrows(IOException::class.java) { writer.write(Samples.ecg) }
+            writer.write(Samples.hr)
+            writer.write(Samples.ecg)
+        }
+        val fragment = RawCodec.encode(Samples.ecg).take(10)
+        assertEquals(
+            listOf(RawCodec.encode(Samples.header), fragment, RawCodec.encode(Samples.hr), RawCodec.encode(Samples.ecg)),
+            file.readText().removeSuffix("\n").split("\n"),
+        )
+    }
+
+    @Test
+    fun aWriteThatFailsBeforeStoringAnythingLeavesNoEmptyLine() {
+        val file = newFile()
+        val failing = FailingOnce(stored = 0)
+        RawWriter.createWithSync(file, monoNs = { 0L }, syncIntervalNs = 0, writeBytes = failing::write) {}.use { writer ->
+            writer.write(Samples.header)
+            failing.armed = true
+            assertThrows(IOException::class.java) { writer.write(Samples.ecg) }
+            writer.write(Samples.hr)
+        }
+        assertEquals(RawCodec.encode(Samples.header) + "\n" + RawCodec.encode(Samples.hr) + "\n", file.readText())
     }
 
     @Test

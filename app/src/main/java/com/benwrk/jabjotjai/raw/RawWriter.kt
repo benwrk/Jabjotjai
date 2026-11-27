@@ -17,13 +17,36 @@ class RawWriter private constructor(
     private val syncIntervalNs: Long,
     private val monoNs: () -> Long,
     private val sync: (FileOutputStream) -> Unit,
+    private val writeBytes: (FileOutputStream, ByteArray) -> Unit,
 ) : Closeable {
 
     private var lastSyncNs = monoNs()
     private var unsynced = false
 
+    /** The file's length as of the last write that succeeded. */
+    private var written = 0L
+
+    /** Whether the last write failed, which may have left part of its line in the file. */
+    private var failed = false
+
+    /**
+     * Appends [record] as one line. If the write before it failed after storing part of its line,
+     * a newline ends that fragment first, so it reads as one malformed line and this record still
+     * starts a line of its own instead of being joined to it.
+     *
+     * @throws IOException if the line cannot be written; the next write can still be tried
+     */
     fun write(record: RawRecord) {
-        out.write((RawCodec.encode(record) + "\n").encodeToByteArray())
+        val line = (RawCodec.encode(record) + "\n").encodeToByteArray()
+        val bytes = if (failed && out.channel.size() > written) byteArrayOf(NEWLINE) + line else line
+        try {
+            writeBytes(out, bytes)
+        } catch (e: Exception) {
+            failed = true
+            throw e
+        }
+        written = if (failed) out.channel.size() else written + bytes.size
+        failed = false
         unsynced = true
         syncIfDue()
     }
@@ -49,6 +72,8 @@ class RawWriter private constructor(
     }
 
     companion object {
+        private const val NEWLINE = '\n'.code.toByte()
+
         /** One second: the most a power cut may lose. */
         const val DEFAULT_SYNC_INTERVAL_NS: Long = 1_000_000_000L
 
@@ -64,11 +89,15 @@ class RawWriter private constructor(
             syncIntervalNs: Long = DEFAULT_SYNC_INTERVAL_NS,
         ): RawWriter = createWithSync(file, monoNs, syncIntervalNs) { it.fd.sync() }
 
-        /** [create] with the sync replaced, so tests can observe when it happens. */
+        /**
+         * [create] with the sync, and the writing of each line's bytes, replaced, so tests can
+         * observe when a sync happens and make a write fail part-way.
+         */
         internal fun createWithSync(
             file: File,
             monoNs: () -> Long,
             syncIntervalNs: Long,
+            writeBytes: (FileOutputStream, ByteArray) -> Unit = { out, bytes -> out.write(bytes) },
             sync: (FileOutputStream) -> Unit,
         ): RawWriter {
             val directory = file.absoluteFile.parentFile
@@ -78,7 +107,7 @@ class RawWriter private constructor(
             if (!file.createNewFile()) {
                 throw IOException("refusing to reopen an existing raw file: $file")
             }
-            return RawWriter(FileOutputStream(file, true), syncIntervalNs, monoNs, sync)
+            return RawWriter(FileOutputStream(file, true), syncIntervalNs, monoNs, sync, writeBytes)
         }
     }
 }

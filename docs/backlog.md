@@ -37,10 +37,6 @@ is the entry "Record a stream that goes silent" below.
 
 ## Handle a full disk and a failed write
 
-- `RawWriter.write` keeps no failed state. A write that stores part of a line and then fails
-  would leave a fragment that the next record (the `stream_error`, then the `end`) is appended
-  to, making one malformed line that hides the record explaining the failure. Whether a write
-  can store part of a buffer before failing on Android is unverified.
 - `CaptureRecovery.find` writes the ending note and reads the file without catching a failure,
   so with the disk full the picker's call would throw, likely on every opening of the app (not
   tried).
@@ -49,10 +45,9 @@ is the entry "Record a stream that goes silent" below.
   is why it waits for recovery to report failures.
 - Nothing checks free space before or during a capture.
 
-Done when after a failed write the file still ends at a line boundary or the next write starts
-a new line, recovery reports a failure instead of throwing and decodes by the header's schema,
-the app warns before starting with little space and during a capture when space runs low, and
-tests cover a write that fails.
+A write that fails part-way now has its fragment ended before the next record (`RawWriter`).
+Done when recovery reports a failure instead of throwing and decodes by the header's schema, and
+the app warns before starting with little space and during a capture when space runs low.
 
 ## Say what the stored times measure
 
