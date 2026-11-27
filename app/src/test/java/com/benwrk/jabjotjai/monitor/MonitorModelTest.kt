@@ -30,7 +30,9 @@ class MonitorModelTest {
         // 125 - 100 = 25, so 10 and 20 are older than the window; 30 and later stay.
         assertArrayEquals(longArrayOf(30, 100, 125), ecg.tNs)
         assertArrayEquals(intArrayOf(3, 4, 5), ecg.values)
-        assertEquals(FrameTiming(lastSampleTNs = 125, receivedMonoNs = 2_000), model.snapshot().ecgTiming)
+        // The first frame came through with the least delay, 970, so the newest sample is placed as if
+        // it had too (see ArrivalDelay); the timing used to be the newest frame's own arrival.
+        assertEquals(FrameTiming(lastSampleTNs = 125, receivedMonoNs = 125 + 970), model.snapshot().ecgTiming)
     }
 
     @Test
@@ -186,5 +188,20 @@ class MonitorModelTest {
         )
         val trend = model.snapshot().heartRateTrend
         assertEquals(listOf(60, 60, TrendSnapshot.BREAK, 60), trend.values.take(trend.size))
+    }
+
+    @Test
+    fun theSweepFollowsTheLeastArrivalDelayAndStartsOverWhenTheStrapClockGoesBack() {
+        val model = MonitorModel()
+        // Samples 100 apart, frames arriving 1_000, 1_050 and 1_020 after their last sample.
+        model.feed(
+            EcgRecord(0, 1_100, listOf(100), listOf(1)),
+            EcgRecord(0, 1_250, listOf(200), listOf(2)),
+            EcgRecord(0, 1_320, listOf(300), listOf(3)),
+        )
+        assertEquals(FrameTiming(300, 300 + 1_000), model.snapshot().ecgTiming)
+        // After the strap's clock goes back, only the delays measured since count.
+        model.feed(EcgRecord(0, 5_000, listOf(10), listOf(4)))
+        assertEquals(FrameTiming(10, 5_000), model.snapshot().ecgTiming)
     }
 }

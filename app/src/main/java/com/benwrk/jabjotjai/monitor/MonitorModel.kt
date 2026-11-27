@@ -83,6 +83,8 @@ data class MonitorSnapshot(
 class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
 
     private val beats = BeatSchedule()
+    private val ecgArrival = ArrivalDelay()
+    private val accArrival = ArrivalDelay()
     private val heartRateTrend = TrendSeries()
     private val rrTrend = TrendSeries()
     private val ecg = SampleSeries()
@@ -124,13 +126,13 @@ class MonitorModel(private val keepNs: Long = DEFAULT_KEEP_NS) {
                 is HeaderRecord -> header = record
                 is EcgRecord -> {
                     ecg.append(record.tNs, record.uV, keepNs)
-                    record.tNs.lastOrNull()?.let { ecgTiming = FrameTiming(it, record.monoNs) }
+                    record.tNs.lastOrNull()?.let { ecgTiming = ecgArrival.timing(ecgTiming, it, record.monoNs) }
                 }
                 is AccRecord -> {
                     accX.append(record.tNs, record.xMg, keepNs)
                     accY.append(record.tNs, record.yMg, keepNs)
                     accZ.append(record.tNs, record.zMg, keepNs)
-                    record.tNs.lastOrNull()?.let { accTiming = FrameTiming(it, record.monoNs) }
+                    record.tNs.lastOrNull()?.let { accTiming = accArrival.timing(accTiming, it, record.monoNs) }
                 }
                 is HrRecord -> {
                     heartRate = HeartRate(
@@ -259,3 +261,36 @@ fun MonitorSnapshot.elapsedSeconds(nowMonoNs: Long): Long? =
 
 /** [seconds] as `h:mm:ss`. */
 fun elapsedText(seconds: Long): String = "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
+
+/**
+ * The least delay seen, over the last [WINDOW_NS] of frames, between a stream's last sample being
+ * taken and its frame arriving. Frames are only ever delayed on the way, by amounts that vary from
+ * frame to frame, so the least delay is the steadiest map from the strap's clock to the phone's.
+ * The sweep's cursor, anchored to each frame's own arrival, jumped by that variation at every
+ * frame; anchored to this, it moves at an even pace.
+ */
+internal class ArrivalDelay {
+    private val received = ArrayDeque<Long>()
+    private val delays = ArrayDeque<Long>()
+
+    /** The timing to draw [lastSampleTNs] with, its frame having arrived at [receivedMonoNs]. */
+    fun timing(previous: FrameTiming?, lastSampleTNs: Long, receivedMonoNs: Long): FrameTiming {
+        // The strap's clock went back, as on reconnecting: delays measured against it no longer hold.
+        if (previous != null && lastSampleTNs < previous.lastSampleTNs) {
+            received.clear()
+            delays.clear()
+        }
+        received.addLast(receivedMonoNs)
+        delays.addLast(receivedMonoNs - lastSampleTNs)
+        while (received.first() < receivedMonoNs - WINDOW_NS) {
+            received.removeFirst()
+            delays.removeFirst()
+        }
+        return FrameTiming(lastSampleTNs, lastSampleTNs + delays.min())
+    }
+
+    private companion object {
+        /** Long enough to see a frame that came through quickly, short enough to follow clock drift. */
+        const val WINDOW_NS = 30_000_000_000L
+    }
+}
