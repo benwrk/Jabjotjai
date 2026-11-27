@@ -60,8 +60,8 @@ on battery with the screen off (item 4), which is in `docs/backlog.md`. The owne
 
 ## 0.2: rewinding the running capture
 
-The current scope: the monitor can go back through the capture that is running, the way a live
-video stream can be rewound.
+Built and seen working on the test phone: the monitor can go back through the capture that is
+running, the way a live video stream can be rewound.
 
 1. **A timeline under the monitor** runs from the capture's start to now. Releasing it after a
    drag moves the playhead to that moment; within a second of now counts as live. A LIVE button,
@@ -76,6 +76,23 @@ video stream can be rewound.
    playhead, at a point the capture's own reader noted while reading the file from its first line,
    and never further than the playhead has reached, so the screen holds exactly what had been
    received by then.
+
+## 0.3: captures that outlast the app being stopped
+
+The current scope (decision `0013`). When Android stops the app, nothing of it runs, so a capture
+cannot end itself properly; it is noted and resumed afterwards instead.
+
+1. **A capture that has no `end` record is noted afterwards**, in a separate ending note beside
+   its file, which is never reopened: why it ended, from Android's record of why the app's
+   process died, and the last moment the file received.
+2. **It resumes by itself when nobody chose the stop**: after Android stops the app to free
+   memory, and after the app is updated.
+3. **The app offers to resume when someone did**: after Force stop, a stop from the task manager,
+   or a crash, when the app is next opened.
+4. **A resumed capture is a new file** whose header names the capture it continues, connecting
+   to the same strap without a scan. The time between the two files is a gap, never stitched
+   across.
+5. **Swiping the app away from recent apps does not stop a capture.**
 
 ## Later
 
