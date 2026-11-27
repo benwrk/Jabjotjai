@@ -64,6 +64,7 @@ import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
 import com.benwrk.jabjotjai.monitor.Playback
 import com.benwrk.jabjotjai.monitor.RowSignal
+import com.benwrk.jabjotjai.monitor.SweepSpeed
 import com.benwrk.jabjotjai.monitor.chartGraphs
 import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.TraceSnapshot
@@ -195,7 +196,6 @@ private class Bands(
 ) {
     val ecgScale: State<BandScale> get() = scales.getValue(RowSignal.ECG)
 
-    val mmPerSecond: () -> Float = { settings.value.sweep.mmPerSecond }
 }
 
 /**
@@ -234,7 +234,7 @@ private fun EcgBand(bands: Bands, graph: ChartGraph, modifier: Modifier) {
         R.string.monitor_ecg_label,
         plainNumber(ecgMultiple(scale.index)),
         plainNumber(gain),
-        plainNumber(bands.settings.value.sweep.mmPerSecond),
+        plainNumber(graph.speed.mmPerSecond),
     ) + if (bands.settings.value.ecgAuto) " " + stringResource(R.string.monitor_auto) else ""
     Band(label = { if (graph.cascadeIndex == 0) Text(label, color = MonitorColors.Ecg, fontFamily = MonitorMono, style = MaterialTheme.typography.labelSmall) }, modifier) {
         SweepTrace(
@@ -244,13 +244,13 @@ private fun EcgBand(bands: Bands, graph: ChartGraph, modifier: Modifier) {
             timing = { it.ecgTiming },
             color = MonitorColors.Ecg,
             pxPerMm = bands.pxPerMm,
-            mmPerSecond = bands.mmPerSecond,
+            mmPerSecond = { graph.speed.mmPerSecond },
             offsetPx = bandOffset(ScaleLadder.ECG, bands.ecgScale, bands.pxPerMm),
             cascadeIndex = graph.cascadeIndex,
             cascadeSize = graph.cascadeSize,
             modifier = Modifier.fillMaxSize(),
         )
-        if (bands.settings.value.calibrationPulse && graph.cascadeIndex == 0) CalibrationPulse(bands, Modifier.fillMaxSize())
+        if (bands.settings.value.calibrationPulse && graph.cascadeIndex == 0) CalibrationPulse(bands, graph.speed, Modifier.fillMaxSize())
     }
 }
 
@@ -263,6 +263,7 @@ private fun AccBand(bands: Bands, axes: List<AccAxis>, bandScale: State<BandScal
     val scale = bandScale.value
     val title = stringResource(R.string.monitor_acc_label)
     val scaleText = stringResource(R.string.monitor_acc_scale, plainNumber(ScaleLadder.ACC.mmPerUnit(scale.index))) +
+        " " + stringResource(R.string.monitor_speed, plainNumber(graph.speed.mmPerSecond)) +
         if (bands.settings.value.accAuto) " " + stringResource(R.string.monitor_auto) else ""
     val label = buildAnnotatedString {
         withStyle(SpanStyle(color = MonitorColors.Text)) { append(title) }
@@ -282,7 +283,7 @@ private fun AccBand(bands: Bands, axes: List<AccAxis>, bandScale: State<BandScal
                 timing = { it.accTiming },
                 color = axis.color,
                 pxPerMm = bands.pxPerMm,
-                mmPerSecond = bands.mmPerSecond,
+                mmPerSecond = { graph.speed.mmPerSecond },
                 offsetPx = offset,
                 cascadeIndex = graph.cascadeIndex,
                 cascadeSize = graph.cascadeSize,
@@ -331,7 +332,7 @@ private const val PULSE_SECONDS = 0.2f
  * than the room under the label its top is cut there and marked as clipped, like the trace.
  */
 @Composable
-private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
+private fun CalibrationPulse(bands: Bands, speed: SweepSpeed, modifier: Modifier) {
     Canvas(modifier) {
         val scale = bands.ecgScale.value
         val pxPerMicrovolt = ScaleLadder.ECG.mmPerSample(scale.index) * bands.pxPerMm
@@ -342,7 +343,7 @@ private fun CalibrationPulse(bands: Bands, modifier: Modifier) {
         val height = 1_000 * pxPerMicrovolt
         val top = maxOf(zero - height, ceiling)
         val left = PULSE_LEFT_MM * bands.pxPerMm
-        val right = left + PULSE_SECONDS * bands.mmPerSecond() * bands.pxPerMm
+        val right = left + PULSE_SECONDS * speed.mmPerSecond * bands.pxPerMm
         val foot = PULSE_FOOT_MM * bands.pxPerMm
         val path = Path().apply {
             moveTo(left - foot, zero)

@@ -46,6 +46,7 @@
     <string name="monitor_ecg_label">ECG · ×%1$s · %2$s mm/mV · %3$s mm/s</string>
     <string name="monitor_acc_label">ACC</string>
     <string name="monitor_acc_scale">· %1$s mm/g</string>
+    <string name="monitor_speed">· %1$s mm/s</string>
     <string name="monitor_auto">· auto</string>
     <string name="monitor_read_error">Cannot read the raw file: %1$s</string>
     <string name="monitor_beep_unavailable">No beep: %1$s</string>
@@ -79,7 +80,6 @@
 
     <string name="display_open">Display settings</string>
     <string name="display_title">Display</string>
-    <string name="display_sweep">Sweep speed, mm/s</string>
     <string name="display_ecg_gain">ECG gain</string>
     <string name="display_acc_scale">Accelerometer scale, mm/g</string>
     <string name="display_auto">Auto</string>
@@ -87,10 +87,12 @@
     <string name="display_pulse">Calibration pulse</string>
     <string name="display_pulse_hint">A 1 mV pulse at the left of the ECG, rising from the line where the trace draws 0 mV.</string>
     <string name="display_rows">Rows</string>
-    <string name="display_rows_hint">Rows of the same signal next to each other are one taller graph when joined; otherwise each row carries the trace on from the row above.</string>
+    <string name="display_rows_hint">Below a row of the same signal, a row can be separate, at its own speed; cascaded, carrying the trace on from the row above; or joined to it as one taller graph.</string>
     <string name="display_row">Row %1$d</string>
-    <string name="display_row_joined">Joined with the row above</string>
-    <string name="display_row_cascaded">Carries on from the row above</string>
+    <string name="display_row_joined">Joined</string>
+    <string name="display_row_separate">Separate</string>
+    <string name="display_row_speed">%1$s mm/s</string>
+    <string name="display_row_cascaded">Cascaded</string>
     <string name="display_row_add">Add a row</string>
     <string name="display_row_remove">Remove the last row</string>
     <string name="signal_ecg">ECG</string>

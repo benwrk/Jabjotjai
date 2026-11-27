@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.DisplaySettings
 import com.benwrk.jabjotjai.monitor.ScaleLadder
-import com.benwrk.jabjotjai.monitor.SweepSpeed
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import java.math.BigDecimal
 
@@ -55,16 +54,6 @@ fun DisplaySheet(
             Text(stringResource(R.string.display_title), style = MaterialTheme.typography.titleMedium)
 
             RowsEditor(settings.rows) { rows -> onChange { it.copy(rows = rows) } }
-
-            Choices(stringResource(R.string.display_sweep)) {
-                for (speed in SweepSpeed.entries) {
-                    FilterChip(
-                        selected = settings.sweep == speed,
-                        onClick = { onChange { it.copy(sweep = speed) } },
-                        label = { Text(plainNumber(speed.mmPerSecond)) },
-                    )
-                }
-            }
 
             Choices(stringResource(R.string.display_ecg_gain)) {
                 FilterChip(

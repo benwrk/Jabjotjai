@@ -51,8 +51,9 @@ object DisplaySettingsStore {
     private fun load(context: Context): DisplaySettings {
         val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         val defaults = DisplaySettings()
+        val sweep = SweepSpeed.entries.firstOrNull { it.name == prefs.getString(SWEEP, null) } ?: defaults.sweep
         return DisplaySettings(
-            sweep = SweepSpeed.entries.firstOrNull { it.name == prefs.getString(SWEEP, null) } ?: defaults.sweep,
+            sweep = sweep,
             ecgAuto = prefs.getBoolean(ECG_AUTO, defaults.ecgAuto),
             ecgGainIndex = prefs.getInt(ECG_GAIN, defaults.ecgGainIndex).takeIf { it in 0 until ScaleLadder.ECG.size } ?: defaults.ecgGainIndex,
             accAuto = prefs.getBoolean(ACC_AUTO, defaults.accAuto),
@@ -62,7 +63,8 @@ object DisplaySettingsStore {
             beepInBackground = prefs.getBoolean(BEEP_IN_BACKGROUND, defaults.beepInBackground),
             beepVolume = prefs.getFloat(BEEP_VOLUME, defaults.beepVolume).coerceIn(0f, 1f),
             timeFromStart = prefs.getBoolean(TIME_FROM_START, defaults.timeFromStart),
-            rows = prefs.getString(CHART_ROWS, null)?.let(::decodeChartRows) ?: defaults.rows,
+            // Rows kept by 0.4 had the one sweep speed of their day.
+            rows = prefs.getString(CHART_ROWS, null)?.let { decodeChartRows(it, legacySpeed = sweep) } ?: defaults.rows,
         )
     }
 

@@ -11,34 +11,61 @@ enum class RowSignal {
     ACC_Z,
 }
 
-/**
- * One row of the chart: what it shows, and whether it is joined to the row above into one taller
- * graph, which only counts when the row above shows the same signal.
- */
-data class ChartRow(val signal: RowSignal, val joinedAbove: Boolean = false)
+/** How a row stands to the row above it, when both show the same signal. */
+enum class RowRelation {
+    /** A graph of its own, at its own speed. */
+    SEPARATE,
+
+    /** The trace carries on from the row above: one sweep folded across both. */
+    CASCADED,
+
+    /** One taller graph with the row above. */
+    JOINED,
+}
 
 /**
- * One graph of the chart, [rows] tall. Graphs of one signal next to each other that are not joined
- * make a cascade, as on a bedside monitor: one sweep [cascadeSize] graphs long, folded across them
- * top to bottom, so the trace runs on from each graph into the next and one cursor moves through
- * them all. This graph is number [cascadeIndex] of its cascade, from 0 at the top.
+ * One row of the chart: what it shows, how it stands to the row above, and its sweep speed, which
+ * counts only where it starts a graph or a cascade. A relation other than [RowRelation.SEPARATE]
+ * only counts when the row above shows the same signal.
  */
-data class ChartGraph(val signal: RowSignal, val rows: Int, val cascadeIndex: Int = 0, val cascadeSize: Int = 1)
+data class ChartRow(val signal: RowSignal, val relation: RowRelation = RowRelation.SEPARATE, val speed: SweepSpeed = SweepSpeed.MM_25)
 
-/** The graphs [rows] make: joined rows merged, unjoined neighbours of one signal cascaded. */
+/**
+ * One graph of the chart, [rows] tall, sweeping at [speed]. Graphs in a cascade are one sweep
+ * [cascadeSize] graphs long, folded across them top to bottom, as a bedside monitor cascades its
+ * ECG: the trace runs on from each graph into the next and one cursor moves through them all. This
+ * graph is number [cascadeIndex] of its cascade, from 0 at the top.
+ */
+data class ChartGraph(
+    val signal: RowSignal,
+    val rows: Int,
+    val speed: SweepSpeed = SweepSpeed.MM_25,
+    val cascadeIndex: Int = 0,
+    val cascadeSize: Int = 1,
+)
+
+/**
+ * The graphs [rows] make: a joined row makes the graph above it taller, a cascaded row adds a graph
+ * to the cascade above it at that cascade's speed, and a separate row, or one whose row above
+ * shows another signal, starts a graph of its own at its own speed.
+ */
 fun chartGraphs(rows: List<ChartRow>): List<ChartGraph> {
-    // Each run of one signal: the heights of its graphs, top to bottom.
-    val runs = mutableListOf<Pair<RowSignal, MutableList<Int>>>()
+    // Each cascade: its signal, its speed and the heights of its graphs, top to bottom. A graph
+    // that is not cascaded is a cascade of one.
+    class Cascade(val signal: RowSignal, val speed: SweepSpeed, val heights: MutableList<Int>)
+    val cascades = mutableListOf<Cascade>()
     for (row in rows) {
-        val run = runs.lastOrNull()
+        val above = cascades.lastOrNull()?.takeIf { it.signal == row.signal }
         when {
-            run == null || run.first != row.signal -> runs += row.signal to mutableListOf(1)
-            row.joinedAbove -> run.second[run.second.lastIndex]++
-            else -> run.second += 1
+            above == null || row.relation == RowRelation.SEPARATE -> cascades += Cascade(row.signal, row.speed, mutableListOf(1))
+            row.relation == RowRelation.JOINED -> above.heights[above.heights.lastIndex]++
+            else -> above.heights += 1
         }
     }
-    return runs.flatMap { (signal, heights) ->
-        heights.mapIndexed { index, rows -> ChartGraph(signal, rows, cascadeIndex = index, cascadeSize = heights.size) }
+    return cascades.flatMap { cascade ->
+        cascade.heights.mapIndexed { index, height ->
+            ChartGraph(cascade.signal, height, cascade.speed, cascadeIndex = index, cascadeSize = cascade.heights.size)
+        }
     }
 }
 
@@ -52,18 +79,37 @@ val DEFAULT_CHART_ROWS = listOf(ChartRow(RowSignal.ECG), ChartRow(RowSignal.ACC)
 const val MAX_CHART_ROWS = 6
 
 /**
- * The rows as kept in settings: each row's signal, comma separated, with a `+` before a row joined
- * to the one above, such as `ECG,+ECG,ACC`.
+ * The rows as kept in settings, comma separated: each row's signal, after `>` if cascaded or `+`
+ * if joined, and after `@` the speed of a separate row, such as `ECG@MM_25,>ECG,ACC@MM_12_5`.
  */
-fun encodeChartRows(rows: List<ChartRow>): String =
-    rows.joinToString(",") { (if (it.joinedAbove) "+" else "") + it.signal.name }
+fun encodeChartRows(rows: List<ChartRow>): String = rows.joinToString(",") { row ->
+    when (row.relation) {
+        RowRelation.SEPARATE -> "${row.signal.name}@${row.speed.name}"
+        RowRelation.CASCADED -> ">${row.signal.name}"
+        RowRelation.JOINED -> "+${row.signal.name}"
+    }
+}
 
-/** The rows [text] keeps, or null if it is not a list [encodeChartRows] would write. */
-fun decodeChartRows(text: String): List<ChartRow>? {
+/**
+ * The rows [text] keeps, or null if it is not a list [encodeChartRows] would write. Text without
+ * any `@` was written by 0.4, which had one speed, given as [legacySpeed], and cascaded every
+ * unjoined row below another of its signal; it is read that way, so a layout set in 0.4 stays.
+ */
+fun decodeChartRows(text: String, legacySpeed: SweepSpeed = SweepSpeed.MM_25): List<ChartRow>? {
+    val legacy = '@' !in text
+    var previous: RowSignal? = null
     val rows = text.split(",").map { part ->
-        val joined = part.startsWith("+")
-        val signal = RowSignal.entries.firstOrNull { it.name == part.removePrefix("+") } ?: return null
-        ChartRow(signal, joined)
+        val relation = when {
+            part.startsWith("+") -> RowRelation.JOINED
+            part.startsWith(">") -> RowRelation.CASCADED
+            legacy && part.removePrefix("+").let { name -> RowSignal.entries.any { it.name == name && it == previous } } -> RowRelation.CASCADED
+            else -> RowRelation.SEPARATE
+        }
+        val body = part.removePrefix("+").removePrefix(">")
+        val signal = RowSignal.entries.firstOrNull { it.name == body.substringBefore('@') } ?: return null
+        val speed = if (legacy) legacySpeed else SweepSpeed.entries.firstOrNull { it.name == body.substringAfter('@', "") } ?: legacySpeed
+        previous = signal
+        ChartRow(signal, relation, speed)
     }
     return rows.takeIf { it.size in 1..MAX_CHART_ROWS }
 }
