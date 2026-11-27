@@ -3,6 +3,15 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// The app's semantic version. Android refuses to install a lower versionCode over a higher one
+// (developer.android.com/studio/publish/versioning), so versionCode is derived from the version
+// rather than maintained by hand, and grows whenever the version does.
+val appVersion = "0.1.0"
+val appVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) ->
+    require(minor < 1000 && patch < 1000) { "minor and patch must stay below 1000: $appVersion" }
+    major * 1_000_000 + minor * 1_000 + patch
+}
+
 android {
     namespace = "com.benwrk.jabjotjai"
     compileSdk {
@@ -13,8 +22,8 @@ android {
         applicationId = "com.benwrk.jabjotjai"
         minSdk = 33
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
