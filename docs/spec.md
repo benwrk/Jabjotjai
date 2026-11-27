@@ -228,6 +228,8 @@ The current scope.
 3. **The playback bar carries the app's version and its credit**, faintly, in one line between LIVE
    and the volume, only where it fits whole: "Jabjotjai 0.7.0 by benwrk · Made with ♥ in Bangkok"
    (decision `0018`).
+4. **The whole app is set in the monospaced font that ships with it**, the monitor's, so its start
+   screens, sheets and dialogs look the same on every phone too.
 
 ## Later
 
