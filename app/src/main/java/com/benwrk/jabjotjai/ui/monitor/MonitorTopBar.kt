@@ -243,20 +243,20 @@ private fun BeepWarning(error: String) {
 }
 
 /**
- * Skin contact as an icon: lit with contact, amber when the strap reports none, dark while unknown.
+ * Skin contact as an electrode with OK, OFF when the strap reports none, or NA while unknown.
  * The gap count, amber when there are any; the strap's battery; the last RR interval.
  */
 @Composable
 private fun VitalsGrid(contact: Boolean?, batteryPercentage: Int?, gaps: Int, lastRrMs: Int?) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column {
-            val (contactTip, contactColor) = when (contact) {
-                true -> R.string.monitor_contact_ok to MonitorColors.Text
-                false -> R.string.monitor_contact_none to MonitorColors.Warning
-                null -> R.string.monitor_contact_unknown to DARK
+            val (contactTip, contactWord, contactColor) = when (contact) {
+                true -> Triple(R.string.monitor_contact_ok, R.string.monitor_contact_ok_short, MonitorColors.Text)
+                false -> Triple(R.string.monitor_contact_none, R.string.monitor_contact_off_short, MonitorColors.Warning)
+                null -> Triple(R.string.monitor_contact_unknown, R.string.monitor_contact_unknown_short, DARK)
             }
             WithTip(stringResource(contactTip)) {
-                Icon(painterResource(R.drawable.ic_contact), contentDescription = null, tint = contactColor, modifier = Modifier.size(ICON))
+                IconValue(R.drawable.ic_contact, stringResource(contactWord), CONTACT_CELLS, contactColor)
             }
             val gapColor = if (gaps > 0) MonitorColors.Warning else MonitorColors.Secondary
             WithTip(stringResource(R.string.tip_gaps, gaps)) {
@@ -405,4 +405,5 @@ private const val HEART_RATE_CELLS = 3
 private const val PERCENT_CELLS = 4
 private const val RR_CELLS = 4
 private const val GAP_CELLS = 3
+private const val CONTACT_CELLS = 3
 

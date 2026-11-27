@@ -112,8 +112,8 @@ cannot end itself properly; it is noted and resumed afterwards instead.
    shown, and the waveforms take the full width under one bar that holds, from the left: the
    strap's id and its connection as an icon; the phone's date and time to the second, as the phone
    is set to show them, and its battery, with a bolt while charging; an amber icon while battery
-   optimisation is on, and one if the beep cannot play; skin contact as an icon, lit, amber when
-   the strap reports none and dark while unknown; the strap's battery, marked with the strap's
+   optimisation is on, and one if the beep cannot play; skin contact as an electrode with OK, OFF
+   when the strap reports none, or NA while unknown; the strap's battery, marked with the strap's
    icon, the gap count and the last RR interval; heart rate and the beat heart; and Stop, which
    asks before stopping. Every icon says what it is when tapped or held. Numbers are in a
    monospaced font that ships with the app, so the monitor looks the same on every phone, and each
