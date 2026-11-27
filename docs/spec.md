@@ -127,6 +127,21 @@ noted and resumed afterwards instead (decision `0013`).
    and the connection, its second the gap count, the strap's battery and its skin contact. Its Stop
    opens the app and asks first, as the monitor's stop does.
 
+## 0.4: chart rows
+
+The current scope.
+
+1. **The chart is a column of rows**, set from the cog menu: how many, and what each shows:
+   ECG, the accelerometer with X, Y and Z together, one accelerometer axis, heart rate, or RR
+   interval. Signals added later, such as HRV, join the same list.
+2. **Neighbouring rows of the same signal are joined or cascaded.** Joined rows are one graph as
+   tall as the rows together. Cascaded rows carry the trace on from the row above, so two ECG rows
+   show twice as many seconds, the newest at the bottom, as a bedside monitor's cascaded ECG does.
+3. **Heart-rate and RR rows** plot the values the strap reported, on the same time axis as the
+   waveforms, each with its own scale.
+4. **The choices are kept between runs.** The default is the layout 0.3 has: one ECG row above one
+   accelerometer row.
+
 ## Later
 
 Not scheduled. Each becomes a version when it is specified:
