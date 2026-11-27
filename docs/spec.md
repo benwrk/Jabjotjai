@@ -188,12 +188,12 @@ Built and seen working on the test phone, except moving an earlier file's times 
 
 ## 0.7: the chart under the camera, a value under the finger, and a battery shortcut
 
-Built and seen working on the test phone (Galaxy S25, camera hole in the middle of the top edge),
-except: a camera in a corner of the screen, which only unit tests cover; the screens before a
-capture, which now keep clear of the system bars and the camera themselves rather than through
-the app's frame, not yet looked at since; and the fixes that only a failure shows, such as the
-message when the last capture cannot be checked and a failed stream starting again on the strap
-(`docs/backlog.md`).
+Built and seen working on the test phone (Galaxy S25, camera hole in the middle of the top edge).
+The screens before a capture, which now keep clear of the system bars and the camera themselves,
+were seen on an emulator instead (Android 37, with a centre hole and a corner cut-out emulated,
+2026-11-28). Not seen anywhere: the monitor with a camera in a corner, which unit tests cover, and
+the fixes only a failure shows, such as the message when the last capture cannot be checked and a
+failed stream starting again on the strap (`docs/backlog.md`).
 
 1. **The chart can use the whole display**, the camera cut-out included: an option in the cog menu
    lets the monitor reach the screen's edges under the cut-out instead of stopping short of it. A
