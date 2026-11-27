@@ -223,6 +223,8 @@ The current scope.
      does not set the scale either, and is marked at its top edge.
 
    Holding a finger on a marked value reads its real value.
+2. **The cog menu can restore every display setting to its default**, after asking, since one tap
+   would otherwise lose a layout of rows built up over time. The recording is not affected.
 
 ## Later
 

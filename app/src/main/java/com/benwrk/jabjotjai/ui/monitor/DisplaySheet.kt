@@ -9,14 +9,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -136,6 +142,26 @@ fun DisplaySheet(
                 enabled = settings.beep,
                 onCheckedChange = { keep -> onChange { it.copy(beepInBackground = keep) } },
             )
+
+            // Asks first: one tap would otherwise lose a layout of rows built up over time.
+            var askingToRestore by rememberSaveable { mutableStateOf(false) }
+            TextButton(onClick = { askingToRestore = true }) { Text(stringResource(R.string.display_restore)) }
+            if (askingToRestore) {
+                AlertDialog(
+                    onDismissRequest = { askingToRestore = false },
+                    title = { Text(stringResource(R.string.display_restore_title)) },
+                    text = { Text(stringResource(R.string.display_restore_body)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            askingToRestore = false
+                            onChange { DisplaySettings() }
+                        }) { Text(stringResource(R.string.display_restore_confirm)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { askingToRestore = false }) { Text(stringResource(R.string.display_restore_keep)) }
+                    },
+                )
+            }
         }
     }
 }

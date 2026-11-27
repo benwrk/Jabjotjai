@@ -109,6 +109,11 @@
     <string name="display_rr_ceiling">Longest RR on the scale</string>
     <string name="display_rr_ceiling_none">None</string>
     <string name="display_rr_ceiling_ms">%1$d ms</string>
+    <string name="display_restore">Restore defaults</string>
+    <string name="display_restore_title">Restore the defaults?</string>
+    <string name="display_restore_body">Every display setting goes back to how a new install has it: the rows and their speeds and spans, the scales, the beep and the rest. The recording is not affected.</string>
+    <string name="display_restore_confirm">Restore</string>
+    <string name="display_restore_keep">Keep my settings</string>
     <string name="display_rows">Rows</string>
     <string name="display_rows_hint">Below a row of the same signal, a row can be separate, at its own speed; cascaded, carrying the trace on from the row above; or joined to it as one taller graph.</string>
     <string name="display_row">Row %1$d</string>
