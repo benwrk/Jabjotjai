@@ -375,8 +375,6 @@ owner has chosen.
 
 ## Harden what the build downloads
 
-- The Gradle 9.9.2 upgrade dropped `distributionSha256Sum`, so the distribution, which runs with
-  the signing secrets in CI, is not checked, and the wrapper jar is still the one from 9.0 or 9.1.
 - There is no `gradle/verification-metadata.xml`, so no artifact's checksum is checked. JitPack
   is now an exclusive repository for Polar's group.
 - Polar's SDK brings in old versions with published advisories (OSV, 2026-11-28): gson 2.8.5,
@@ -384,9 +382,9 @@ owner has chosen.
   permission the HTTP stack is inert; protobuf parses what the strap sends.
 - Nothing proposes updates to the pinned actions or dependencies.
 
-Done when the wrapper is regenerated with its checksum, verification metadata covers every
-artifact, each advisory is either resolved by a newer version or recorded as not reachable, and
-Dependabot or the like watches at least the actions.
+Done when verification metadata covers every artifact, each advisory is either resolved by a
+newer version or recorded as not reachable, and Dependabot or the like watches at least the
+actions.
 
 ## Close smaller gaps in CI and the repository
 
