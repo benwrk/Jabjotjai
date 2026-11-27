@@ -296,7 +296,7 @@ class CaptureService : Service() {
             val ms = (SystemClock.elapsedRealtimeNanos() - startedNs) / 1_000_000
             Log.i(TAG, "read the trends of ${read.files} earlier files, ${read.bytes / 1_000_000} MB, in $ms ms; ${read.unreadable} could not be read")
             val snapshot = earlier.snapshot()
-            Capture.publishEarlierTrends(EarlierTrends.Read(session, snapshot.heartRateTrend, snapshot.rrTrend, read.unreadable))
+            Capture.publishEarlierTrends(EarlierTrends.Read(session, snapshot.heartRateTrend, snapshot.rrTrend, read.unreadable, read.read))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

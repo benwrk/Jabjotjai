@@ -1,7 +1,10 @@
 package com.benwrk.jabjotjai.monitor
 
+import com.benwrk.jabjotjai.raw.EventRecord
+import com.benwrk.jabjotjai.raw.GapRecord
 import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.RawDecoders
+import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.raw.RawLine
 import com.benwrk.jabjotjai.raw.RawTail
 import java.io.File
@@ -51,17 +54,33 @@ fun earlierCaptures(dir: File, current: HeaderRecord, historyNs: Long = TREND_HI
 private const val MAX_EARLIER_FILES = 200
 
 /**
- * How much [readEarlierTrends] read: [files] files of [bytes] in all, [unreadable] of them skipped
- * because they could not be read, and whether it [finished] rather than being stopped.
+ * An earlier file of a resumed capture, as [readEarlierTrends] found it: [shiftNs] places its times
+ * on the current file's clock (see [clockShiftNs]), on which it runs from [startNs] to [endNs], its
+ * last line; [timeline] maps those times to places in the file, as the capture's own reader maps
+ * its file, so the past reader can start part-way through it.
  */
-data class EarlierTrendsRead(val files: Int, val bytes: Long, val unreadable: Int, val finished: Boolean)
+class EarlierFile(val file: File, val header: HeaderRecord, val shiftNs: Long, val startNs: Long, val endNs: Long, val timeline: CaptureTimeline)
+
+/**
+ * How much [readEarlierTrends] read: [files] files of [bytes] in all, [unreadable] of them skipped
+ * because they could not be read, and whether it [finished] rather than being stopped; and the
+ * files read, oldest first, for the past reader.
+ */
+data class EarlierTrendsRead(
+    val files: Int,
+    val bytes: Long,
+    val unreadable: Int,
+    val finished: Boolean,
+    val read: List<EarlierFile> = emptyList(),
+)
 
 /**
  * Reads the heart-rate and RR history of the files [current] continues into [model], oldest
  * first, each placed on [current]'s clock and ended with a break, so the time between files is
- * never joined (see [MonitorModel.acceptEarlier]). Only heart-rate, gap and event lines are
- * decoded; a line's type is told from its start, so the waveform lines that make up most of a file
- * cost only their reading.
+ * never joined (see [MonitorModel.acceptEarlier]), and maps each file for the past reader (see
+ * [EarlierFile]). Only heart-rate, gap and event lines are decoded; a line's type is told from its
+ * start, and its time from its `"mono_ns":` field, so the waveform lines that make up most of a
+ * file cost little more than their reading.
  *
  * A file that cannot be read, or stops being readable part-way, is ended with a break where its
  * reading stopped and counted in [EarlierTrendsRead.unreadable]; the rest are still read. A line
@@ -81,30 +100,54 @@ fun readEarlierTrends(
     var done = 0L
     var reported = -1
     var unreadable = 0
+    val read = mutableListOf<EarlierFile>()
     for ((file, header) in earlier) {
-        if (!keepGoing()) return EarlierTrendsRead(earlier.size, total, unreadable, finished = false)
+        if (!keepGoing()) return EarlierTrendsRead(earlier.size, total, unreadable, finished = false, read)
         val shift = clockShiftNs(header, current)
         var last = header.start.monoNs
+        val timeline = CaptureTimeline()
+        var connection: String? = null
+        var battery: Int? = null
+        var gaps = 0
         try {
             file.bufferedReader().useLines { lines ->
                 var decode: ((String) -> RawLine)? = null
                 var count = 0
+                var offset = 0L
                 for (line in lines) {
+                    val lineOffset = offset
                     // Each character of a raw line is one byte, and the newline one more.
+                    offset += line.length + 1
                     done += line.length + 1
                     if (++count % CHECK_EVERY_LINES == 0) {
-                        if (!keepGoing()) return EarlierTrendsRead(earlier.size, total, unreadable, finished = false)
+                        if (!keepGoing()) return EarlierTrendsRead(earlier.size, total, unreadable, finished = false, read)
                         val percent = (done * 100 / total).toInt()
                         if (percent > reported) {
                             reported = percent
                             onProgress(percent / 100f)
                         }
                     }
+                    monoNsOf(line)?.let { time ->
+                        timeline.addLine(lineOffset, time + shift)
+                        if (time > last) last = time
+                    }
                     val use = decode ?: RawDecoders.forHeaderLine(line, file).also { decode = it }
                     if (!line.startsWith(HR_LINE) && !line.startsWith(GAP_LINE) && !line.startsWith(EVENT_LINE)) continue
                     val decoded = use(line)
                     model.acceptEarlier(decoded, shift)
-                    (decoded as? RawLine.Record)?.record?.timeMonoNs()?.let { if (it > last) last = it }
+                    val record = (decoded as? RawLine.Record)?.record ?: continue
+                    // Where the state changes, noted as the capture's own reader notes it.
+                    val changed = when (record) {
+                        is EventRecord -> when (record.event) {
+                            RawEvents.CONNECTING, RawEvents.CONNECTED, RawEvents.DISCONNECTED -> true.also { connection = record.event }
+                            RawEvents.BATTERY -> true.also { battery = record.levelPct }
+                            else -> false
+                        }
+                        is GapRecord -> true.also { gaps++ }
+                        else -> false
+                    }
+                    if (changed) timeline.addState(record.timeMonoNs() + shift, CaptureStateAt(connection, battery, gaps))
+                    if (record.timeMonoNs() > last) last = record.timeMonoNs()
                 }
             }
         } catch (e: Exception) {
@@ -113,10 +156,31 @@ fun readEarlierTrends(
             unreadable++
         }
         model.endEarlier(last + shift)
+        read += EarlierFile(file, header, shift, header.start.monoNs + shift, last + shift, timeline)
     }
     onProgress(1f)
-    return EarlierTrendsRead(earlier.size, total, unreadable, finished = true)
+    return EarlierTrendsRead(earlier.size, total, unreadable, finished = true, read)
 }
+
+/**
+ * The time in a raw line's `"mono_ns":` field, found as text rather than by decoding the line; for
+ * a header, its start. A gap line has none: its times are `from_mono_ns` and `to_mono_ns`.
+ */
+internal fun monoNsOf(line: String): Long? {
+    val at = line.indexOf(MONO_FIELD)
+    if (at < 0) return null
+    var i = at + MONO_FIELD.length
+    var value = 0L
+    var digits = 0
+    while (i < line.length && line[i] in '0'..'9') {
+        value = value * 10 + (line[i] - '0')
+        i++
+        digits++
+    }
+    return value.takeIf { digits > 0 }
+}
+
+private const val MONO_FIELD = "\"mono_ns\":"
 
 /** How many lines pass between looks at whether to stop and how far reading has got. */
 private const val CHECK_EVERY_LINES = 256
@@ -137,6 +201,12 @@ sealed interface EarlierTrends {
     /** Being read in the background; [fraction] of the files' bytes read so far. */
     data class Reading(override val session: String, val fraction: Float) : EarlierTrends
 
-    /** Read: the history, oldest first, ending in a break, and how many files could not be read. */
-    data class Read(override val session: String, val heartRate: TrendSnapshot, val rr: TrendSnapshot, val unreadable: Int) : EarlierTrends
+    /** Read: the history, oldest first, ending in a break; how many files could not be read; and the files, for the past reader. */
+    data class Read(
+        override val session: String,
+        val heartRate: TrendSnapshot,
+        val rr: TrendSnapshot,
+        val unreadable: Int,
+        val files: List<EarlierFile> = emptyList(),
+    ) : EarlierTrends
 }

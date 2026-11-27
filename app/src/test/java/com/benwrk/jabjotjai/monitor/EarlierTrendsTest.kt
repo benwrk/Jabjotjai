@@ -1,16 +1,19 @@
 package com.benwrk.jabjotjai.monitor
 
 import com.benwrk.jabjotjai.raw.EcgRecord
+import com.benwrk.jabjotjai.raw.EventRecord
 import com.benwrk.jabjotjai.raw.HeaderRecord
 import com.benwrk.jabjotjai.raw.HrRecord
 import com.benwrk.jabjotjai.raw.Phone
 import com.benwrk.jabjotjai.raw.RAW_SCHEMA
 import com.benwrk.jabjotjai.raw.RawCodec
 import com.benwrk.jabjotjai.raw.RawLine
+import com.benwrk.jabjotjai.raw.RawEvents
 import com.benwrk.jabjotjai.raw.RawRecord
 import com.benwrk.jabjotjai.raw.Sensor
 import com.benwrk.jabjotjai.raw.Stamp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -90,7 +93,8 @@ class EarlierTrendsTest {
         val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "a")
         val progress = mutableListOf<Float>()
         val read = readEarlierTrends(MonitorModel(), folder.root, b, onProgress = { progress += it })
-        assertEquals(EarlierTrendsRead(files = 1, bytes = File(folder.root, "a.jsonl").length(), unreadable = 0, finished = true), read)
+        assertEquals(EarlierTrendsRead(files = 1, bytes = File(folder.root, "a.jsonl").length(), unreadable = 0, finished = true), read.copy(read = emptyList()))
+        assertEquals(listOf("a.jsonl"), read.read.map { it.file.name })
         assertTrue("several steps reported: $progress", progress.size > 2)
         assertEquals(progress.sorted(), progress)
         assertEquals(1f, progress.last())
@@ -117,5 +121,25 @@ class EarlierTrendsTest {
         val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "a")
         val read = readEarlierTrends(MonitorModel(), folder.root, b, keepGoing = { false })
         assertEquals(false, read.finished)
+    }
+
+    @Test
+    fun eachEarlierFileIsMappedForThePastReader() {
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        val file = write(a, EventRecord(0, 100 * s + 1, RawEvents.CONNECTED), hr(101 * s, 61), hr(103 * s, 63))
+        val b = header("b", wallMs = 1_010_000, monoNs = 110 * s, continues = "a")
+        val mapped = readEarlierTrends(MonitorModel(), folder.root, b).read.single()
+        assertEquals(100 * s, mapped.startNs)
+        assertEquals(103 * s, mapped.endNs)
+        // The line at 103 s starts after the header, the event and the first heart rate.
+        val offsetOf103 = file.readLines().take(3).sumOf { it.length + 1 }.toLong()
+        assertEquals(offsetOf103, mapped.timeline.markAtOrBefore(103 * s)?.offset)
+        assertEquals(RawEvents.CONNECTED, mapped.timeline.stateAt(102 * s).connection)
+    }
+
+    @Test
+    fun aLinesTimeIsReadFromItsMonoField() {
+        assertEquals(42L, monoNsOf("{\"type\":\"ecg\",\"wall_ms\":1,\"mono_ns\":42,\"t_ns\":[]}"))
+        assertNull(monoNsOf("{\"type\":\"gap\",\"from_mono_ns\":5}"))
     }
 }
