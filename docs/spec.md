@@ -225,6 +225,9 @@ The current scope.
    Holding a finger on a marked value reads its real value.
 2. **The cog menu can restore every display setting to its default**, after asking, since one tap
    would otherwise lose a layout of rows built up over time. The recording is not affected.
+3. **The playback bar carries the app's version and its credit**, faintly, in one line between LIVE
+   and the volume, only where it fits whole: "Jabjotjai 0.7.0 by benwrk · Made with ♥ in Bangkok"
+   (decision `0018`).
 
 ## Later
 
