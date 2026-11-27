@@ -162,9 +162,18 @@ class CaptureService : Service() {
             stopSelf()
             return
         }
-        wakeLock = getSystemService(PowerManager::class.java)
+        // Keeps the CPU awake for as long as the capture runs: taken with a timeout and renewed by the
+        // capture loop below, so that if anything ever failed to release it, it would lapse by itself
+        // within WAKE_LOCK_TIMEOUT_MS. Not reference-counted, so each renewal replaces the pending
+        // timeout instead of adding a count (`PowerManager.WakeLock.acquireLocked` removes the
+        // pending release when not reference-counted, SDK 37 source, read 2026-11-28).
+        val lock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Jabjotjai:capture")
-            .apply { acquire() }
+            .apply {
+                setReferenceCounted(false)
+                acquire(WAKE_LOCK_TIMEOUT_MS)
+            }
+        wakeLock = lock
 
         val api = PolarApi.get(this)
         val sessionId = SessionNames.newId(start.wallMs)
@@ -182,9 +191,17 @@ class CaptureService : Service() {
             session = newSession
             link = PolarH10Link(api, sensorId, sensorAddress, newSession, clock, scope).also { it.connect() }
             Capture.publish(CaptureState.Running(file, sensorId, sensorName))
+            var sinceRenewalMs = 0L
             while (isActive && !newSession.ended) {
                 delay(SYNC_TICK_MS.milliseconds)
                 newSession.syncIfDue()
+                sinceRenewalMs += SYNC_TICK_MS
+                // Renewed only until the capture starts ending, so it cannot be taken again after
+                // the ending has released it.
+                if (sinceRenewalMs >= WAKE_LOCK_RENEW_MS && ending == null) {
+                    lock.acquire(WAKE_LOCK_TIMEOUT_MS)
+                    sinceRenewalMs = 0L
+                }
             }
         }
     }
@@ -539,6 +556,11 @@ class CaptureService : Service() {
         private const val CHANNEL_ID = "capture"
         private const val NOTIFICATION_ID = 1
         private const val SYNC_TICK_MS = 1_000L
+
+        /** How long the wake lock holds without being renewed, and how often the capture renews it. */
+        private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
+        private const val WAKE_LOCK_RENEW_MS = 60_000L
+
         private const val NOTIFICATION_UPDATE_MS = 1_000L
 
         /**
