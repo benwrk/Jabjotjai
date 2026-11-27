@@ -19,6 +19,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // The Polar BLE SDK is published only through JitPack, which builds artifacts from GitHub
+        // on request. Restricted to Polar's group so no other dependency can resolve from it.
+        maven {
+            url = uri("https://jitpack.io")
+            content { includeGroup("com.github.polarofficial") }
+        }
     }
 }
 
