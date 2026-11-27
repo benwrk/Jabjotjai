@@ -217,6 +217,27 @@ showed it. Done when a stream that has started, or has delivered, and then sends
 set time while connected is recorded as such in the raw file, with the time chosen from each
 stream's measured frame interval, and a test shows the record being written.
 
+## Decide what the gap count counts
+
+The gap count on the top bar and in the notification ("Gaps N") is the number of `gap` records in
+the file being written (`MonitorModel`, `EarlierTrends`), which says less than it seems to:
+
+- A record is one stream, so one disconnection adds up to three, for ECG, motion and heart rate
+  (`CaptureSession.disconnected`).
+- A record is written when its stream resumes, so the count does not move during an outage, and
+  a dropout still open at Stop is only in the end record's `open_gaps`, never counted.
+- It starts again at 0 in each file of a resumed capture, though the tip says "Gaps in this
+  capture".
+- Samples lost while a stream stayed connected are not recorded as gaps (`docs/raw-format.md`),
+  and neither is a stream that goes silent while connected (the entry above), so a count of 0
+  does not mean nothing was lost.
+
+Candidates are the number of dropouts, counting a disconnection once, and the time they lost,
+each across every file of the capture and counted from the moment a dropout begins. This is read
+from the code, 2026-11-28; the count has not been seen to move on the test phone. Done when the
+owner has chosen what it shows, and the top bar, the notification, the tip and `docs/spec.md`
+agree.
+
 ## Let the user hide heart rate from the lock screen
 
 The capture notification shows heart rate on the lock screen, the owner's chosen default
