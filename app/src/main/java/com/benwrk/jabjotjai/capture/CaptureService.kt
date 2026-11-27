@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -204,11 +205,15 @@ class CaptureService : Service() {
     /**
      * Shows what the raw file says, the way the monitor does: by tailing it (`AGENTS.md`, "Live is
      * a reader tailing the raw file"), so a capture that stops writing shows as one. It reads
-     * continuously, which keeps the connection and battery events from early in the file, but
-     * posts only while the screen is on, since nobody can see it otherwise. The system "might drop
-     * updates" posted "many in less than one second"
+     * continuously, which keeps the connection and battery events from early in the file. The
+     * system "might drop updates" posted "many in less than one second"
      * (developer.android.com/develop/ui/views/notifications/build-notification, read 2026-11-27),
-     * so it posts at most once a second, and only when the text has changed.
+     * so it posts at most once a second, and only when the content has changed.
+     *
+     * While the screen is off, the heart rate is posted as no value: following it then would mean
+     * posting every second all night for nobody, and leaving the last value up would show a stale
+     * number on an always-on display and for a moment after the screen wakes. The rest changes
+     * rarely and is still posted.
      */
     private suspend fun keepNotificationCurrent(file: File, sensorName: String, startWallMs: Long) {
         val manager = getSystemService(NotificationManager::class.java)
@@ -228,12 +233,11 @@ class CaptureService : Service() {
             }
             var shown: NotificationContent? = null
             while (true) {
-                if (power.isInteractive) {
-                    val content = NotificationContent.of(model.snapshot(), SystemPhoneClock.monoNs(), readFailed)
-                    if (content != shown && running) {
-                        manager.notify(NOTIFICATION_ID, notification(sensorName, startWallMs, content))
-                        shown = content
-                    }
+                val current = NotificationContent.of(model.snapshot(), SystemPhoneClock.monoNs(), readFailed)
+                val content = if (power.isInteractive) current else current.copy(bpm = null)
+                if (content != shown && running) {
+                    manager.notify(NOTIFICATION_ID, notification(sensorName, startWallMs, content))
+                    shown = content
                 }
                 delay(NOTIFICATION_UPDATE_MS)
             }
@@ -268,8 +272,10 @@ class CaptureService : Service() {
                 content.batteryPct?.let { getString(R.string.monitor_battery, it) },
             ).joinToString(" · ")
         }
+        val icon = content.bpm?.takeUnless { content.readFailed }?.let { HeartRateIcon.create(this, it) }
+            ?: Icon.createWithResource(this, R.drawable.ic_stat_capture)
         return Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_capture)
+            .setSmallIcon(icon)
             .setContentTitle(content.bpm?.let { getString(R.string.capture_notification_hr, it) } ?: getString(R.string.capture_notification_hr_none))
             .setContentText(details)
             .setSubText(sensorName)
