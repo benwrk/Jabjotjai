@@ -99,7 +99,7 @@ private class BelowAnchor(private val gapPx: Int) : PopupPositionProvider {
     }
 }
 
-private val TIP_BACKGROUND = Color(0xFF2A2A2A)
+internal val TIP_BACKGROUND = Color(0xFF2A2A2A)
 private const val TIP_MIN_MS = 2_000L
 private const val TIP_MS_PER_CHAR = 40L
 private const val TIP_MAX_MS = 9_000L

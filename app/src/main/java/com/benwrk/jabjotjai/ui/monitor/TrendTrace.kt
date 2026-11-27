@@ -1,27 +1,43 @@
 package com.benwrk.jabjotjai.ui.monitor
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.ChartGraph
 import com.benwrk.jabjotjai.monitor.Sweep
 import com.benwrk.jabjotjai.monitor.TrendMotion
 import com.benwrk.jabjotjai.monitor.TrendSnapshot
+import com.benwrk.jabjotjai.monitor.nearestTrendPoint
 import com.benwrk.jabjotjai.monitor.trendRange
+import com.benwrk.jabjotjai.monitor.trendTimeAt
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import com.benwrk.jabjotjai.ui.theme.MonitorMono
+import java.text.SimpleDateFormat
+import java.util.Date
 
 /**
  * A heart-rate or RR graph: [trends], each a series oldest first, such as the history of the files a
@@ -52,8 +68,7 @@ fun TrendTrace(
         val rowNs = graph.span.ns
         val stripNs = rowNs * graph.cascadeSize
         val sweeping = graph.motion == TrendMotion.SWEEP
-        // The oldest time the strip shows: a sweep leaves a gap before its cursor, as the waveforms do.
-        val earliest = now - stripNs + if (sweeping) rowNs / ERASE_FRACTION else 0L
+        val earliest = trendWindowStart(now, graph)
         val range = trendRange(series, earliest, now, step, minRange) ?: return@Canvas
         val (low, high) = range
 
@@ -100,3 +115,70 @@ fun TrendTrace(
         drawText(bottom, topLeft = Offset(size.width - bottom.size.width - margin, size.height - bottom.size.height - margin))
     }
 }
+
+/**
+ * The oldest time a heart-rate or RR [graph] shows when its newest is [nowNs]: a cascade's whole
+ * strip back, less the gap a sweep leaves before its cursor, as the waveforms do.
+ */
+internal fun trendWindowStart(nowNs: Long, graph: ChartGraph): Long {
+    val rowNs = graph.span.ns
+    return nowNs - rowNs * graph.cascadeSize + if (graph.motion == TrendMotion.SWEEP) rowNs / ERASE_FRACTION else 0L
+}
+
+/**
+ * While a finger is held on a heart-rate or RR graph, a line under it and the value of [trends]
+ * nearest it, followed by [unit], with the time it was received in the phone's time format;
+ * moving the finger moves both, and lifting it takes them away. Where no value is near the finger,
+ * only the time shows. [wallMsAt] turns a time on the phone's monotonic clock into wall-clock time.
+ */
+@Composable
+fun TrendReadout(
+    trends: () -> List<TrendSnapshot>,
+    nowMonoNs: State<Long>,
+    graph: ChartGraph,
+    unit: String,
+    wallMsAt: (Long) -> Long?,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    var held by remember { mutableStateOf<Offset?>(null) }
+    val textMeasurer = rememberTextMeasurer()
+    val context = LocalContext.current
+    val timeFormat = remember(context) {
+        val locale = context.resources.configuration.locales[0]
+        SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, if (DateFormat.is24HourFormat(context)) "Hms" else "hms"), locale)
+    }
+    val withValue = stringResource(R.string.monitor_trend_readout)
+    val withoutValue = stringResource(R.string.monitor_trend_readout_time)
+    Canvas(
+        modifier.pointerInput(graph) {
+            detectDragGesturesAfterLongPress(
+                onDragStart = { held = it },
+                onDragEnd = { held = null },
+                onDragCancel = { held = null },
+                onDrag = { change, _ -> held = change.position },
+            )
+        },
+    ) {
+        val at = held ?: return@Canvas
+        if (size.width <= 0f) return@Canvas
+        val now = nowMonoNs.value
+        val x = at.x.coerceIn(0f, size.width)
+        val t = trendTimeAt(x / size.width, now, graph)
+        val reachNs = (READOUT_REACH.toPx() / size.width * graph.span.ns).toLong()
+        val point = nearestTrendPoint(trends(), t, trendWindowStart(now, graph), now, reachNs)
+        drawLine(color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
+
+        val time = wallMsAt(point?.tNs ?: t)?.let { timeFormat.format(Date(it)) } ?: return@Canvas
+        val text = if (point != null) String.format(withValue, point.value, unit, time) else String.format(withoutValue, time)
+        val label = textMeasurer.measure(text, TextStyle(color = MonitorColors.Text, fontSize = 12.sp, fontFamily = MonitorMono))
+        val padding = 4.dp.toPx()
+        val boxWidth = label.size.width + 2 * padding
+        val left = (x - boxWidth / 2).coerceIn(0f, (size.width - boxWidth).coerceAtLeast(0f))
+        drawRoundRect(TIP_BACKGROUND, Offset(left, padding), Size(boxWidth, label.size.height + 2 * padding), CornerRadius(4.dp.toPx()))
+        drawText(label, topLeft = Offset(left + padding, 2 * padding))
+    }
+}
+
+/** How far either side of the finger a value is still read as the one under it. */
+private val READOUT_REACH = 12.dp

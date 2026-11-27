@@ -33,6 +33,11 @@
 
     <string name="monitor_hr">HR</string>
     <string name="monitor_bpm">bpm</string>
+    <string name="monitor_ms">ms</string>
+    <!-- A value read off a heart-rate or RR graph under a held finger: the value, its unit and the time it was received. -->
+    <string name="monitor_trend_readout">%1$d %2$s · %3$s</string>
+    <!-- The time under a held finger where the graph has no value. -->
+    <string name="monitor_trend_readout_time">%1$s</string>
     <string name="monitor_no_value">—</string>
     <string name="monitor_contact_ok">Skin contact</string>
     <string name="monitor_contact_none">No skin contact</string>

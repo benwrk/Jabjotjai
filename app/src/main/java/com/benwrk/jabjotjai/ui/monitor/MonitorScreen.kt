@@ -235,11 +235,11 @@ private fun Waveforms(bands: Bands, modifier: Modifier) {
             when (graph.signal) {
                 RowSignal.ECG -> EcgBand(bands, graph, graphModifier)
                 RowSignal.HR -> TrendBand(
-                    stringResource(R.string.monitor_hr_trend, graph.span.minutes), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.heartRate, bands.trends.value.heartRateTrend) }, bands, graph,
+                    stringResource(R.string.monitor_hr_trend, graph.span.minutes), stringResource(R.string.monitor_bpm), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.heartRate, bands.trends.value.heartRateTrend) }, bands, graph,
                     MonitorColors.Ecg, step = 10, minRange = 40, dots = false, graphModifier,
                 )
                 RowSignal.RR -> TrendBand(
-                    stringResource(R.string.monitor_rr_trend, graph.span.minutes), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.rr, bands.trends.value.rrTrend) }, bands, graph,
+                    stringResource(R.string.monitor_rr_trend, graph.span.minutes), stringResource(R.string.monitor_ms), { listOfNotNull((bands.earlier.value as? EarlierTrends.Read)?.rr, bands.trends.value.rrTrend) }, bands, graph,
                     MonitorColors.Text, step = 100, minRange = 400, dots = true, graphModifier,
                 )
                 RowSignal.ACC -> AccBand(bands, ACC_AXES, bands.scales.getValue(RowSignal.ACC), graph, graphModifier)
@@ -488,11 +488,13 @@ private fun rememberPxPerMm(): Float {
 
 /**
  * A heart-rate or RR graph with its label, given once on a cascade's top graph. A line breaks after
- * [TREND_JOIN_NS] without a value, as heart rate comes about once a second.
+ * [TREND_JOIN_NS] without a value, as heart rate comes about once a second. Holding a finger on it
+ * reads the value under the finger, in [unit] (see [TrendReadout]).
  */
 @Composable
 private fun TrendBand(
     label: String,
+    unit: String,
     trends: () -> List<TrendSnapshot>,
     bands: Bands,
     graph: ChartGraph,
@@ -506,6 +508,15 @@ private fun TrendBand(
         Box(Modifier.fillMaxSize()) {
             TrendTrace(trends, bands.frameClock, graph, color, step, minRange, dots, maxJoinNs = TREND_JOIN_NS, modifier = Modifier.fillMaxSize())
             if (graph.cascadeIndex == 0) EarlierTrendsNote(bands.earlier.value, color)
+            TrendReadout(
+                trends,
+                bands.frameClock,
+                graph,
+                unit,
+                wallMsAt = { monoNs -> bands.trends.value.header?.start?.let { it.wallMs + (monoNs - it.monoNs) / 1_000_000 } },
+                color = color,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

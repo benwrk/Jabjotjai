@@ -199,6 +199,9 @@ The current scope.
 3. **The amber battery icon takes the user to turning battery optimisation off**: a tap opens
    Android's request to let the app run unrestricted (decision `0017`), and the icon goes once that
    is allowed.
+4. **Holding a finger on a heart-rate or RR row reads the value under it**: a line under the finger
+   and the nearest value with the time it was received, in the phone's time format, following the
+   finger as it moves and gone when it lifts; where no value is near, only the time shows.
 
 ## Later
 
