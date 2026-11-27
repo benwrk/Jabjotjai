@@ -125,6 +125,10 @@ logical change before moving on, rather than holding verified work in the tree.
 issues without being asked. Commit on the current branch, and fix forward rather than
 force-pushing.
 
+**Name things in whole words**: `batteryPercentage`, not `batteryPct`. Units (`monoNs`, `rrMs`)
+and the domain's own terms (ECG, HR, RR) stay short, and a name may mirror the stored field it
+reads (`levelPct` reads `level_pct`, which raw files already hold).
+
 **Leave touched code cleaner than you found it.** When the cleanup is large enough to be its own
 change, say so instead of silently widening scope.
 
