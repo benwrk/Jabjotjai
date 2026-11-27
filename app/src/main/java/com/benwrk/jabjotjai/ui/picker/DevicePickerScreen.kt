@@ -60,7 +60,7 @@ fun DevicePickerScreen(
             items(found, key = { it.id }) { sensor ->
                 ListItem(
                     headlineContent = { Text(sensor.name) },
-                    supportingContent = { Text(stringResource(R.string.picker_rssi, sensor.id, sensor.rssiDbm)) },
+                    supportingContent = { Text(stringResource(R.string.picker_rssi, sensor.rssiDbm)) },
                     colors = ListItemDefaults.colors(containerColor = MonitorColors.Background),
                     modifier = Modifier.clickable { onPick(sensor) },
                 )

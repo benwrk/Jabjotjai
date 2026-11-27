@@ -15,7 +15,7 @@
     <string name="picker_scanning">Scanning…</string>
     <string name="picker_none">No H10 found.</string>
     <string name="picker_failed">The last capture stopped: %1$s</string>
-    <string name="picker_rssi">%1$s · %2$d dBm</string>
+    <string name="picker_rssi">Signal %1$d dBm</string>
 
     <string name="resume_title">The last capture stopped</string>
     <string name="resume_body_at">The capture with %1$s stopped at %2$s: %3$s. Resume it with the same strap? Its recording is kept, and the time between is shown as a gap.</string>
