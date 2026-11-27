@@ -92,6 +92,15 @@ class PlaybackTest {
     }
 
     @Test
+    fun slowerPlaybackChosenAtLiveFallsBehindItInsteadOfReturning() {
+        val slow = Playback.Live.withSpeed(0.5f, nowNs = 300 * s)
+        assertEquals(Playback.Past(anchorNs = 300 * s, anchorNowNs = 300 * s, speed = 0.5f, paused = false), slow)
+        // A fifth of a second on, a tenth behind: within a second of live, and still not live.
+        assertEquals(slow, slow.caughtUp(nowNs = 300 * s + 200_000_000L))
+        assertEquals(slow, slow.caughtUp(nowNs = 310 * s))
+    }
+
+    @Test
     fun replayedBeatsMoveOntoTheRealClockAtTheSpeedAndFallSilentWhenTheyShould() {
         val beats = listOf(201 * s, 202 * s)
         val past = Playback.Past(anchorNs = 200 * s, anchorNowNs = 300 * s, speed = 2f, paused = false)

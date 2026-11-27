@@ -253,13 +253,6 @@ The other mechanism this entry used to track, the path-scoped pointer, was seen 
 2026-11-27: writing a file under `docs/decisions/` brought the pointer from
 `.claude/rules/decisions.md` into the session (decision `0001`).
 
-## Keep slower-than-live playback behind live
-
-`docs/spec.md` 0.2 item 2: playing slower than 1× at live falls behind it. Instead, 0.5× at live
-returns to live within 200 ms: `Playback.caughtUp` ignores the speed, so a playhead 0.1 s behind
-counts as caught up (traced 2026-11-28; so since 0.2). Done when only playback faster than 1×
-catches up, and a test sets 0.5× at live and checks it is still in the past a second later.
-
 ## Make scrubbing hold up when interrupted
 
 Found by reading `MonitorViewModel`, not yet tried on the phone:

@@ -63,9 +63,13 @@ fun Playback.togglePause(nowNs: Long): Playback = when (this) {
     is Playback.Past -> Playback.Past(positionNs(nowNs), nowNs, speed, !paused)
 }
 
-/** Live once playback faster than real time has caught up; otherwise unchanged. */
+/**
+ * Live once playback at real time or faster is within a second of live; otherwise unchanged.
+ * Slower playback stays in the past even there: 0.5× chosen at live starts at live and falls
+ * behind it from then on (`docs/spec.md` 0.2 item 2).
+ */
 fun Playback.caughtUp(nowNs: Long): Playback =
-    if (this is Playback.Past && !paused && positionNs(nowNs) >= nowNs - Playback.LIVE_WITHIN_NS) Playback.Live else this
+    if (this is Playback.Past && !paused && speed >= 1f && positionNs(nowNs) >= nowNs - Playback.LIVE_WITHIN_NS) Playback.Live else this
 
 /**
  * Moves the playhead [byNs] from where it is now, back if negative, as [seek] does: kept to the
