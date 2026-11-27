@@ -1,14 +1,22 @@
 # Jabjotjai
 
-**A Holter-style recorder for a chest-strap ECG sensor.**
-
-Android 13+ · No account · No internet access · Version 0.4.0, prerelease
-
-**[Download 0.4.0](https://github.com/benwrk/Jabjotjai/releases/tag/v0.4.0)**
-
 <p align="center">
   <img src="docs/screenshots/monitor-landscape.gif" alt="The live monitor in landscape while the wearer moves: two cascaded ECG rows above the accelerometer's X, Y and Z, with heart rate, RR interval and the strap's status in the bar above" width="900">
 </p>
+
+A Holter-style recorder for a chest-strap ECG sensor, as an Android app.
+
+It records everything the strap sends, ECG, beat-to-beat (RR) intervals, heart rate and motion,
+continuously, through exercise, sleep and everything in between, and keeps it, as received, on your
+phone. It works with the Polar H10, needs no account and has no internet access. Only tested on a
+Samsung Galaxy S25 with Android 17.
+
+## Get the app
+
+Download `jabjotjai-0.4.0.apk` from the
+[0.4.0 release](https://github.com/benwrk/Jabjotjai/releases/tag/v0.4.0), an early prerelease, and
+open it on a phone running Android 13 or later. A newer version installs over an older one and
+keeps your recordings; never uninstall to update, because uninstalling deletes them.
 
 <table align="center">
   <tr>
@@ -23,11 +31,6 @@ Android 13+ · No account · No internet access · Version 0.4.0, prerelease
 </table>
 
 ## About this app
-
-Jabjotjai is a Holter-style recorder for a chest-strap ECG sensor. It captures everything the
-strap sends, ECG, beat-to-beat (RR) intervals, heart rate and motion, continuously, through
-exercise, sleep and everything in between, and keeps it, as received, on your phone. It works with
-the Polar H10.
 
 **Watch it live, like a bedside monitor**
 
