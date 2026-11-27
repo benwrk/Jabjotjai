@@ -243,10 +243,6 @@ showing another moment.
 
 ## Keep the monitor's indicators current
 
-- A tip whose text changes never hides by itself, because its timer restarts on every change
-  (`LaunchedEffect(tip)` in `Tip.kt`): the RR tip changes about once a second, within its
-  timer. Tapping the icon again closes and at once reopens it (read in Compose UI 1.10.4's popup
-  code, not tried).
 - `StopQuestion` is process-wide and cleared only when answered, so a question opened from the
   notification and left unanswered can greet the next capture's monitor (not tried).
 - The clock's 12- or 24-hour format is remembered, so changing it, or the time zone, shows only

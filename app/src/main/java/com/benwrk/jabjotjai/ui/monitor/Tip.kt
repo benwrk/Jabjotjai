@@ -1,5 +1,6 @@
 package com.benwrk.jabjotjai.ui.monitor
 
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,15 +46,29 @@ fun WithTip(
     content: @Composable () -> Unit,
 ) {
     var shown by remember { mutableStateOf(false) }
+    // A tap on the anchor while the tip shows first closes it, as a touch outside the tip, and then
+    // reaches the anchor as a click; without this, that click showed the tip again at once.
+    var closedAtMs by remember { mutableLongStateOf(0L) }
+    val toggle = {
+        if (shown) {
+            shown = false
+        } else if (SystemClock.uptimeMillis() - closedAtMs > REOPEN_AFTER_CLOSE_MS) {
+            shown = true
+        }
+    }
     Box(
         modifier
-            .combinedClickable(onLongClick = { shown = true }) { if (onClick != null) onClick() else shown = !shown }
+            .combinedClickable(onLongClick = { shown = true }) { if (onClick != null) onClick() else toggle() }
             .semantics { contentDescription = tip },
     ) {
         content()
         if (shown) {
             val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
-            Popup(popupPositionProvider = BelowAnchor(gap), onDismissRequest = { shown = false }) {
+            val close = {
+                shown = false
+                closedAtMs = SystemClock.uptimeMillis()
+            }
+            Popup(popupPositionProvider = BelowAnchor(gap), onDismissRequest = close) {
                 Text(
                     tip,
                     color = tint,
@@ -63,7 +79,9 @@ fun WithTip(
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
-            LaunchedEffect(tip) {
+            // Timed from when the tip was shown, for the text it showed: a tip whose text changes
+            // every second, such as the last RR interval, would otherwise never hide.
+            LaunchedEffect(Unit) {
                 delay((TIP_MIN_MS + tip.length * TIP_MS_PER_CHAR).coerceAtMost(TIP_MAX_MS).milliseconds)
                 shown = false
             }
@@ -85,3 +103,6 @@ private val TIP_BACKGROUND = Color(0xFF2A2A2A)
 private const val TIP_MIN_MS = 2_000L
 private const val TIP_MS_PER_CHAR = 40L
 private const val TIP_MAX_MS = 9_000L
+
+/** How soon after the tip closes a click on its anchor counts as the touch that closed it. */
+private const val REOPEN_AFTER_CLOSE_MS = 500L
