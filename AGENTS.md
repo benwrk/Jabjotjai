@@ -14,6 +14,7 @@ Everything else lives where it loads on demand:
 
 | Knowledge                                | Home              | How it loads                                         |
 | ---------------------------------------- | ----------------- | ---------------------------------------------------- |
+| What the app must do, version by version | `docs/spec.md`    | Read before changing behaviour                       |
 | Durable facts that are not area-specific | `docs/memories/`  | Index below is imported; entries read on demand      |
 | Area-specific constraints                | `docs/rules/`     | Read before working in that area; see below          |
 | Decisions and their rejected options     | `docs/decisions/` | Searched, never loaded                               |
