@@ -351,10 +351,6 @@ private fun percent(percentage: Int?): String =
 private fun HeartRateReadout(bpm: Int?) {
     WithTip(stringResource(R.string.tip_hr)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(stringResource(R.string.monitor_hr), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelMedium)
-                Text(stringResource(R.string.monitor_bpm), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall)
-            }
             Text(
                 (bpm?.toString() ?: stringResource(R.string.monitor_no_value)).inCells(HEART_RATE_CELLS),
                 color = MonitorColors.Ecg,
@@ -362,8 +358,12 @@ private fun HeartRateReadout(bpm: Int?) {
                 lineHeight = 44.sp,
                 fontFamily = MonitorMono,
                 fontWeight = FontWeight.Light,
-                modifier = Modifier.padding(start = 6.dp),
             )
+            // The labels sit between the number and the beat heart.
+            Column(Modifier.padding(start = 6.dp)) {
+                Text(stringResource(R.string.monitor_hr), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.monitor_bpm), color = MonitorColors.Ecg, style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 }
