@@ -147,6 +147,13 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         replayStart.value++
     }
 
+    /** Moves the playhead [byNs] from where it is, back if negative; see [Playback.jump]. */
+    fun jump(byNs: Long) {
+        val start = Capture.live.value.snapshot.header?.start?.monoNs ?: return
+        mutablePlayback.value = mutablePlayback.value.jump(byNs, start, nowNs())
+        replayStart.value++
+    }
+
     fun setSpeed(speed: Float) {
         val before = mutablePlayback.value
         mutablePlayback.value = before.withSpeed(speed, nowNs())

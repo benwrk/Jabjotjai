@@ -37,10 +37,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.benwrk.jabjotjai.R
 import com.benwrk.jabjotjai.monitor.DisplaySettings
+import com.benwrk.jabjotjai.monitor.JUMP_NS
 import com.benwrk.jabjotjai.monitor.Playback
 import com.benwrk.jabjotjai.monitor.elapsedText
 import com.benwrk.jabjotjai.monitor.paused
@@ -54,9 +57,10 @@ import com.benwrk.jabjotjai.ui.theme.MonitorColors
  * to now, over a row of small grey controls.
  *
  * Dragging the line shows the moment under the finger, paused; letting go jumps there and plays on
- * as before the drag. The time counts back from live, or from the capture's start, and a tap
- * switches between the two. The speaker mutes or unmutes the beat beep, and the slider beside it
- * sets its volume; dragging that to nothing mutes it. The cog opens the display settings.
+ * as before the drag. The arrows either side of play jump 15 seconds back or forward. The time
+ * counts back from live, or from the capture's start, and a tap switches between the two. The
+ * speaker mutes or unmutes the beat beep, and the slider beside it sets its volume; dragging that
+ * to nothing mutes it. The cog opens the display settings.
  *
  * @param startNs the capture's start, or null until its header has been read
  */
@@ -72,6 +76,7 @@ fun PlaybackBar(
     onSeek: (Long) -> Unit,
     onSpeed: (Float) -> Unit,
     onLive: () -> Unit,
+    onJump: (Long) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -100,11 +105,15 @@ fun PlaybackBar(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                JumpButton(R.drawable.ic_jump_back, stringResource(R.string.playback_jump_back, JUMP_SECONDS), enabled = startNs != null) { onJump(-JUMP_NS) }
                 SmallIconButton(
                     icon = if (playback.paused) R.drawable.ic_play else R.drawable.ic_pause,
                     description = stringResource(if (playback.paused) R.string.playback_play else R.string.playback_pause),
                     onClick = onTogglePause,
                 )
+                JumpButton(R.drawable.ic_jump_forward, stringResource(R.string.playback_jump_forward, JUMP_SECONDS), enabled = startNs != null && !live) {
+                    onJump(JUMP_NS)
+                }
                 val time = if (settings.timeFromStart) {
                     elapsedText((fraction * lengthNs).toLong() / 1_000_000_000L)
                 } else {
@@ -260,5 +269,28 @@ private fun LiveButton(live: Boolean, onLive: () -> Unit) {
     }
 }
 
+/** The jump buttons' seconds, drawn inside their arrows. */
+private const val JUMP_SECONDS = (JUMP_NS / 1_000_000_000L).toInt()
+
 /** Below this, unmuting brings the volume back to full rather than to near silence. */
 private const val MIN_UNMUTED_VOLUME = 0.1f
+
+/** A circular arrow with the seconds it jumps inside it, as a video player draws it; grey when [enabled] is off. */
+@Composable
+private fun JumpButton(icon: Int, description: String, enabled: Boolean, onClick: () -> Unit) {
+    val tint = if (enabled) MonitorColors.Secondary else MonitorColors.Secondary.copy(alpha = 0.38f)
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(36.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(painterResource(icon), contentDescription = description, tint = tint, modifier = Modifier.size(22.dp))
+            // The arrow's circle is centred a twelfth of the icon below its middle.
+            Text(
+                JUMP_SECONDS.toString(),
+                color = tint,
+                fontSize = 7.sp,
+                lineHeight = 7.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}

@@ -100,11 +100,13 @@ cannot end itself properly; it is noted and resumed afterwards instead.
    moment under the finger, paused; letting go moves the playhead there and plays on, or stays
    paused, as before the drag.
 7. **The timeline is laid out like a video player's** (also in 0.3), quiet so the waveforms keep
-   the eye: a thin line across the full width over a row of small grey controls. The time counts
-   back from live or forward from the capture's start, and a tap switches between the two. A
-   speaker mutes or unmutes the beat beep, and a slider beside it sets the beep's own volume,
-   under the media volume, which it still follows; dragging it to nothing mutes. A cog opens the
-   display settings. The choices are kept between runs.
+   the eye: a thin line across the full width over a row of small grey controls. Arrows either
+   side of play jump 15 seconds back or forward, playing or paused as before; forward is off at
+   live, and a jump to within a second of now goes live. The time counts back from live or forward
+   from the capture's start, and a tap switches between the two. A speaker mutes or unmutes the
+   beat beep, and a slider beside it sets the beep's own volume, under the media volume, which it
+   still follows; dragging it to nothing mutes. A cog opens the display settings. The choices are
+   kept between runs.
 
 ## Later
 

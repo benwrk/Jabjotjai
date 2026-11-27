@@ -162,6 +162,7 @@ fun MonitorScreen(
                 onSeek = viewModel::endScrub,
                 onSpeed = viewModel::setSpeed,
                 onLive = viewModel::goLive,
+                onJump = viewModel::jump,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

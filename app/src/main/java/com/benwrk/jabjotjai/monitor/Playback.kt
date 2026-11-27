@@ -66,3 +66,12 @@ fun Playback.togglePause(nowNs: Long): Playback = when (this) {
 /** Live once playback faster than real time has caught up; otherwise unchanged. */
 fun Playback.caughtUp(nowNs: Long): Playback =
     if (this is Playback.Past && !paused && positionNs(nowNs) >= nowNs - Playback.LIVE_WITHIN_NS) Playback.Live else this
+
+/**
+ * Moves the playhead [byNs] from where it is now, back if negative, as [seek] does: kept to the
+ * capture, live if it lands within a second of now, and playing or paused as before.
+ */
+fun Playback.jump(byNs: Long, startNs: Long, nowNs: Long): Playback = seek(positionNs(nowNs) + byNs, startNs, nowNs)
+
+/** How far the jump buttons move the playhead. */
+const val JUMP_NS: Long = 15_000_000_000L

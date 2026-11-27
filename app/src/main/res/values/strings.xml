@@ -57,6 +57,8 @@
     <string name="playback_speed">%1$s×</string>
     <string name="playback_play">Play</string>
     <string name="playback_pause">Pause</string>
+    <string name="playback_jump_back">Back %1$d seconds</string>
+    <string name="playback_jump_forward">Forward %1$d seconds</string>
     <string name="playback_beep_mute">Mute the beat beep</string>
     <string name="playback_beep_unmute">Beep at each beat</string>
     <string name="playback_beep_volume">Beat beep volume</string>

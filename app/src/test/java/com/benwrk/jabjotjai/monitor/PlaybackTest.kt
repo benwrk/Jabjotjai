@@ -31,6 +31,29 @@ class PlaybackTest {
     }
 
     @Test
+    fun jumpingBackFromLiveLeavesItPlayingFifteenSecondsBehind() {
+        assertEquals(Playback.Past(295 * s, 310 * s, 1f, false), Playback.Live.jump(-JUMP_NS, start, nowNs = 310 * s))
+    }
+
+    @Test
+    fun jumpingMovesFromWhereThePlayheadIsNowAndKeepsSpeedAndPause() {
+        val playing = Playback.Past(anchorNs = 200 * s, anchorNowNs = 300 * s, speed = 2f, paused = false)
+        // At 305 s it is at 210 s: 2x for 5 s.
+        assertEquals(Playback.Past(225 * s, 305 * s, 2f, false), playing.jump(JUMP_NS, start, nowNs = 305 * s))
+        assertEquals(Playback.Past(195 * s, 305 * s, 2f, false), playing.jump(-JUMP_NS, start, nowNs = 305 * s))
+        val paused = playing.copy(paused = true)
+        assertEquals(Playback.Past(185 * s, 305 * s, 2f, true), paused.jump(-JUMP_NS, start, nowNs = 305 * s))
+    }
+
+    @Test
+    fun jumpingIsKeptToTheCaptureAndGoesLiveNearNow() {
+        val early = Playback.Past(anchorNs = 105 * s, anchorNowNs = 300 * s, speed = 1f, paused = true)
+        assertEquals(Playback.Past(start, 300 * s, 1f, true), early.jump(-JUMP_NS, start, nowNs = 300 * s))
+        val nearLive = Playback.Past(anchorNs = 290 * s, anchorNowNs = 300 * s, speed = 1f, paused = true)
+        assertEquals(Playback.Live, nearLive.jump(JUMP_NS, start, nowNs = 300 * s))
+    }
+
+    @Test
     fun seekingToWithinASecondOfNowGoesLive() {
         val past = Playback.Past(anchorNs = 200 * s, anchorNowNs = 300 * s, speed = 1f, paused = false)
         assertEquals(Playback.Live, past.seek(310 * s - Playback.LIVE_WITHIN_NS, start, nowNs = 310 * s))
