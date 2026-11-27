@@ -18,3 +18,6 @@ local.properties
 # that machine's checkout. .claude/settings.json beside it is committed and is where
 # anything project-wide belongs.
 .claude/settings.local.json
+
+# Kotlin compiler session files, written by every build.
+.kotlin/
