@@ -2,6 +2,7 @@ package com.benwrk.jabjotjai.capture
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The phone failing to store what a stream delivered, as opposed to the stream failing: thrown
@@ -38,7 +39,7 @@ internal suspend fun keepStreaming(
     onError: (String) -> Unit,
     wanted: () -> Boolean,
     nowMs: () -> Long,
-    pause: suspend (Long) -> Unit = { delay(it) },
+    pause: suspend (Long) -> Unit = { delay(it.milliseconds) },
 ) {
     var pauseMs = FIRST_PAUSE_MS
     while (true) {

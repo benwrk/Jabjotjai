@@ -66,7 +66,7 @@ fun TrendTrace(
             for (i in 0 until points.size) {
                 val t = points.tNs[i]
                 val value = points.values[i]
-                if (t <= earliest || t > now || value == TrendSnapshot.BREAK) {
+                if (t !in (earliest + 1)..now || value == TrendSnapshot.BREAK) {
                     drawing = false
                     continue
                 }

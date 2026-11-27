@@ -73,7 +73,7 @@ fun trendRange(trends: List<TrendSnapshot>, fromNs: Long, toNs: Long, step: Int,
         for (i in 0 until trend.size) {
             val t = trend.tNs[i]
             val value = trend.values[i]
-            if (t <= fromNs || t > toNs || value == TrendSnapshot.BREAK) continue
+            if (t !in (fromNs + 1)..toNs || value == TrendSnapshot.BREAK) continue
             if (value < low) low = value
             if (value > high) high = value
         }

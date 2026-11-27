@@ -3,6 +3,7 @@ package com.benwrk.jabjotjai.capture
 import android.app.ActivityManager
 import android.content.Context
 import android.util.Log
+import androidx.core.content.edit
 import com.benwrk.jabjotjai.raw.AccRecord
 import com.benwrk.jabjotjai.raw.EcgRecord
 import com.benwrk.jabjotjai.raw.EndRecord
@@ -25,14 +26,15 @@ object RunningCaptureStore {
     private const val PREFS = "capture"
 
     fun save(context: Context, capture: RunningCapture) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString("session", capture.session)
-            .putString("file", capture.file.path)
-            .putString("sensor_id", capture.sensorId)
-            .putString("sensor_name", capture.sensorName)
-            .putString("sensor_address", capture.sensorAddress)
-            // Written at once: the process may be killed a moment later, which is the point.
-            .commit()
+        // Written at once (commit, not apply): the process may be killed a moment later, which is
+        // the point.
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit(commit = true) {
+            putString("session", capture.session)
+            putString("file", capture.file.path)
+            putString("sensor_id", capture.sensorId)
+            putString("sensor_name", capture.sensorName)
+            putString("sensor_address", capture.sensorAddress)
+        }
     }
 
     fun load(context: Context): RunningCapture? {
@@ -47,7 +49,7 @@ object RunningCaptureStore {
     }
 
     fun clear(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().commit()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit(commit = true) { clear() }
     }
 }
 

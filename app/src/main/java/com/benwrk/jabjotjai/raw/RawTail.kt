@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Follows a raw file as it grows. The live monitor is one of these readers, so what it shows is
@@ -73,13 +74,13 @@ class RawTail(
                     throw IOException("raw file shrank from $position to $length bytes: $file")
                 }
                 if (length == position) {
-                    delay(pollIntervalMs)
+                    delay(pollIntervalMs.milliseconds)
                     continue
                 }
                 raf.seek(position)
                 val read = raf.read(buffer, 0, minOf(buffer.size.toLong(), length - position).toInt())
                 if (read <= 0) {
-                    delay(pollIntervalMs)
+                    delay(pollIntervalMs.milliseconds)
                     continue
                 }
                 val readStart = position
@@ -109,7 +110,7 @@ class RawTail(
     private suspend fun awaitFirstLine(): String {
         while (true) {
             firstLineText(file)?.let { return it }
-            delay(pollIntervalMs)
+            delay(pollIntervalMs.milliseconds)
         }
     }
 

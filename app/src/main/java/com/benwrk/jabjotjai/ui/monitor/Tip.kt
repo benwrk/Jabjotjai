@@ -1,6 +1,5 @@
 package com.benwrk.jabjotjai.ui.monitor
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -29,13 +28,13 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * [content] with a tip that a tap or a long press shows below it for a few seconds, longer for a
  * longer tip, and that also describes it to a screen reader. With [onClick], a tap does that
  * instead and only a long press shows the tip.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WithTip(
     tip: String,
@@ -65,7 +64,7 @@ fun WithTip(
                 )
             }
             LaunchedEffect(tip) {
-                delay((TIP_MIN_MS + tip.length * TIP_MS_PER_CHAR).coerceAtMost(TIP_MAX_MS))
+                delay((TIP_MIN_MS + tip.length * TIP_MS_PER_CHAR).coerceAtMost(TIP_MAX_MS).milliseconds)
                 shown = false
             }
         }

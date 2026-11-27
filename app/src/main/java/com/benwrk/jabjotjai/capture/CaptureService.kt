@@ -60,6 +60,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runs one capture in the foreground, independent of any screen: it connects to the strap,
@@ -181,7 +182,7 @@ class CaptureService : Service() {
             link = PolarH10Link(api, sensorId, sensorAddress, newSession, clock, scope).also { it.connect() }
             Capture.publish(CaptureState.Running(file, sensorId, sensorName))
             while (isActive && !newSession.ended) {
-                delay(SYNC_TICK_MS)
+                delay(SYNC_TICK_MS.milliseconds)
                 newSession.syncIfDue()
             }
         }
@@ -401,7 +402,7 @@ class CaptureService : Service() {
                 manager.notify(NOTIFICATION_ID, notification(content))
                 shown = content
             }
-            delay(NOTIFICATION_UPDATE_MS)
+            delay(NOTIFICATION_UPDATE_MS.milliseconds)
         }
     }
 

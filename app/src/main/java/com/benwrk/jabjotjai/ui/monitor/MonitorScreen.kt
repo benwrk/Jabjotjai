@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -28,8 +27,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,7 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -62,23 +61,23 @@ import com.benwrk.jabjotjai.capture.CaptureState
 import com.benwrk.jabjotjai.monitor.AutoScale
 import com.benwrk.jabjotjai.monitor.BandScale
 import com.benwrk.jabjotjai.monitor.ChartGraph
-import com.benwrk.jabjotjai.monitor.EarlierTrends
 import com.benwrk.jabjotjai.monitor.DisplaySettings
+import com.benwrk.jabjotjai.monitor.EarlierTrends
 import com.benwrk.jabjotjai.monitor.MonitorSnapshot
 import com.benwrk.jabjotjai.monitor.MonitorViewModel
 import com.benwrk.jabjotjai.monitor.Playback
 import com.benwrk.jabjotjai.monitor.RowSignal
+import com.benwrk.jabjotjai.monitor.ScaleLadder
 import com.benwrk.jabjotjai.monitor.SweepSpeed
+import com.benwrk.jabjotjai.monitor.TraceSnapshot
 import com.benwrk.jabjotjai.monitor.TrendSnapshot
 import com.benwrk.jabjotjai.monitor.chartGraphs
-import com.benwrk.jabjotjai.monitor.ScaleLadder
-import com.benwrk.jabjotjai.monitor.TraceSnapshot
-import com.benwrk.jabjotjai.monitor.elapsedSeconds
 import com.benwrk.jabjotjai.monitor.positionNs
 import com.benwrk.jabjotjai.ui.theme.MonitorColors
 import com.benwrk.jabjotjai.ui.theme.MonitorMono
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 /** How often an automatic scale looks at its trace again. */
 private const val AUTO_SCALE_TICK_MS = 250L
@@ -416,7 +415,7 @@ private fun rememberBandScale(
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 scale.value = autoScale.update(traces(snapshot.value), bandMm.value, SystemClock.elapsedRealtimeNanos())
-                delay(AUTO_SCALE_TICK_MS)
+                delay(AUTO_SCALE_TICK_MS.milliseconds)
             }
         }
     }
@@ -474,7 +473,7 @@ private fun rememberSecondsClock(): State<Long> {
     LaunchedEffect(Unit) {
         while (true) {
             clock.longValue = SystemClock.elapsedRealtimeNanos()
-            delay(1_000)
+            delay(1_000.milliseconds)
         }
     }
     return clock
@@ -483,7 +482,7 @@ private fun rememberSecondsClock(): State<Long> {
 /** Physical scale from the density the phone reports, so 25 mm/s is 25 millimetres on the glass. */
 @Composable
 private fun rememberPxPerMm(): Float {
-    val metrics = LocalContext.current.resources.displayMetrics
+    val metrics = LocalResources.current.displayMetrics
     return remember(metrics.xdpi, metrics.ydpi) { (metrics.xdpi + metrics.ydpi) / 2f / 25.4f }
 }
 

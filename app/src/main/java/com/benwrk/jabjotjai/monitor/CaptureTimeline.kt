@@ -31,8 +31,8 @@ data class CaptureStateAt(val connection: String?, val batteryPercentage: Int?, 
  * A map of a running capture's raw file, built by the one reader that reads it from its first
  * line: where in the file each second of the capture starts, and how the connection, battery and
  * gap count changed. A reader that jumps to an earlier moment starts at [markAtOrBefore] and takes
- * the state from [stateAt], rather than reading the whole file again, which takes longer the
- * longer the capture runs.
+ * the state from [stateAt], rather than reading the whole file again, which takes
+ * more time the longer the capture runs.
  *
  * Thread-safe: one reader adds to it while others look things up.
  */

@@ -51,7 +51,7 @@ object Sweep {
         var previous = -1
         for (i in tNs.indices) {
             val t = tNs[i]
-            if (t <= earliest || t > cursorNs) continue
+            if (t !in (earliest + 1)..cursorNs) continue
             val breaks = previous < 0 ||
                 previous != i - 1 ||
                 t - tNs[previous] > maxJoinNs ||

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /** A strap seen in a scan, with the Bluetooth address it was advertising from. */
 data class FoundSensor(val id: String, val name: String, val address: String, val rssiDbm: Int)
@@ -37,7 +38,7 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         job = viewModelScope.launch {
             mutableScanning.value = true
             try {
-                withTimeoutOrNull(SCAN_MS) {
+                withTimeoutOrNull(SCAN_MS.milliseconds) {
                     PolarApi.get(getApplication()).searchForDevice().collect { info ->
                         if (!info.name.contains(H10_NAME)) return@collect
                         val sensor = FoundSensor(id = info.deviceId, name = info.name, address = info.address, rssiDbm = info.rssi)

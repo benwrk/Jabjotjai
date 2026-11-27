@@ -48,7 +48,13 @@ class CaptureSessionTest {
     private fun ecg(monoNs: Long, vararg tNs: Long) = EcgRecord(monoNs / 1_000_000, monoNs, tNs.toList(), tNs.map { 100 })
     private fun acc(monoNs: Long, vararg tNs: Long) =
         AccRecord(monoNs / 1_000_000, monoNs, tNs.toList(), tNs.map { 1 }, tNs.map { 2 }, tNs.map { 3 })
-    private fun hr(monoNs: Long) = HrRecord(monoNs / 1_000_000, monoNs, 60, listOf(1024), listOf(1000), true, true, true, 0, 0)
+    private fun hr(monoNs: Long) = HrRecord(monoNs / 1_000_000, monoNs, 60, listOf(1024), listOf(1000),
+        rrAvailable = true,
+        contact = true,
+        contactSupported = true,
+        correctedBpm = 0,
+        ppgQuality = 0
+    )
     private fun disconnect(monoNs: Long) = EventRecord(monoNs / 1_000_000, monoNs, RawEvents.DISCONNECTED, reason = "CONNECTION_LOST")
     private fun streamError(monoNs: Long, stream: String) = EventRecord(monoNs / 1_000_000, monoNs, RawEvents.STREAM_ERROR, stream = stream, message = "x")
 

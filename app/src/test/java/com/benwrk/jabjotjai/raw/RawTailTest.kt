@@ -20,6 +20,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * These run against real files and real time, with a short poll interval. Every file starts with
@@ -44,7 +45,7 @@ class RawTailTest {
 
     private suspend fun failureOf(tail: RawTail): Throwable? {
         var failure: Throwable? = null
-        withTimeout(timeoutMs) { tail.lines().catch { failure = it }.collect {} }
+        withTimeout(timeoutMs.milliseconds) { tail.lines().catch { failure = it }.collect {} }
         return failure
     }
 
@@ -54,11 +55,11 @@ class RawTailTest {
         RawWriter.create(file, monoNs = { 0L }).use { writer ->
             // The file exists but is empty: the tail has to wait for the header.
             val (received, job) = follow(RawTail(file, pollIntervalMs = 5))
-            delay(50)
+            delay(50.milliseconds)
             writer.write(Samples.header)
-            assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs) { received.receive() })
+            assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs.milliseconds) { received.receive() })
             writer.write(Samples.ecg)
-            assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs) { received.receive() })
+            assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs.milliseconds) { received.receive() })
             job.cancel()
         }
     }
@@ -68,15 +69,15 @@ class RawTailTest {
         val file = newFile().apply { writeText(line(Samples.header)) }
         val text = line(Samples.ecg)
         val (received, job) = follow(RawTail(file, pollIntervalMs = 5))
-        assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs) { received.receive() })
+        assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs.milliseconds) { received.receive() })
 
         file.appendText(text.substring(0, 25))
-        delay(150)
+        delay(150.milliseconds)
         assertNull("a torn line must not be emitted", received.tryReceive().getOrNull())
 
         file.appendText(text.substring(25))
         // The positive half: the same tail does emit once the line is whole.
-        assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs) { received.receive() })
+        assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs.milliseconds) { received.receive() })
         job.cancel()
     }
 
@@ -86,7 +87,7 @@ class RawTailTest {
         // Lands inside the hr line, so the first line emitted is the ecg one.
         val from = RawTail.Start.NearEnd(bytes = line(Samples.ecg).length + 5L)
         val (received, job) = follow(RawTail(file, pollIntervalMs = 5), from)
-        assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs) { received.receive() })
+        assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs.milliseconds) { received.receive() })
         job.cancel()
     }
 
@@ -95,21 +96,21 @@ class RawTailTest {
         val file = newFile().apply { writeText(line(Samples.header) + line(Samples.hr) + line(Samples.ecg)) }
         val from = RawTail.Start.NearEnd(bytes = line(Samples.ecg).length.toLong())
         val (received, job) = follow(RawTail(file, pollIntervalMs = 5), from)
-        assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs) { received.receive() })
+        assertEquals(RawLine.Record(Samples.ecg), withTimeout(timeoutMs.milliseconds) { received.receive() })
         job.cancel()
     }
 
     @Test
     fun completesAfterTheEndRecord() = runBlocking {
         val file = newFile().apply { writeText(line(Samples.header) + line(Samples.end)) }
-        val lines = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).lines().toList() }
+        val lines = withTimeout(timeoutMs.milliseconds) { RawTail(file, pollIntervalMs = 5).lines().toList() }
         assertEquals(listOf(RawLine.Record(Samples.header), RawLine.Record(Samples.end)), lines)
     }
 
     @Test
     fun reportsAMalformedLineInsteadOfSkippingIt() = runBlocking {
         val file = newFile().apply { writeText(line(Samples.header) + "not json\n" + line(Samples.end)) }
-        val lines = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).lines().toList() }
+        val lines = withTimeout(timeoutMs.milliseconds) { RawTail(file, pollIntervalMs = 5).lines().toList() }
         assertEquals(3, lines.size)
         assertTrue(lines[1] is RawLine.Malformed)
         assertEquals(RawLine.Record(Samples.end), lines[2])
@@ -122,7 +123,7 @@ class RawTailTest {
         val file = newFile().apply {
             writeText(newerHeader + "\n" + """{"type":"annotation","text":"x"}""" + "\n" + line(Samples.hr) + line(Samples.end))
         }
-        val lines = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).lines().toList() }
+        val lines = withTimeout(timeoutMs.milliseconds) { RawTail(file, pollIntervalMs = 5).lines().toList() }
         assertEquals(
             listOf(
                 RawLine.Record(Samples.header.copy(schema = "1.7")),
@@ -159,9 +160,9 @@ class RawTailTest {
                 .collect { received.send(it) }
         }
         // Wait until the header has been read, so the shrink happens behind the read position.
-        assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs) { received.receive() })
+        assertEquals(RawLine.Record(Samples.header), withTimeout(timeoutMs.milliseconds) { received.receive() })
         RandomAccessFile(file, "rw").use { it.setLength(0) }
-        val thrown = withTimeout(timeoutMs) { failure.receive() }
+        val thrown = withTimeout(timeoutMs.milliseconds) { failure.receive() }
         assertTrue(thrown is IOException && thrown !is UnreadableRawFileException)
         job.cancel()
     }
@@ -188,7 +189,7 @@ class RawTailTest {
         val file = newFile().apply { writeText(texts.joinToString("")) }
         val expectedOffsets = texts.runningFold(0L) { offset, text -> offset + text.toByteArray(Charsets.UTF_8).size }.dropLast(1)
 
-        val read = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
+        val read = withTimeout(timeoutMs.milliseconds) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
 
         assertEquals(expectedOffsets, read.map { it.offset })
         assertEquals(records.map { RawLine.Record(it) }, read.map { it.line })
@@ -198,10 +199,10 @@ class RawTailTest {
     fun startingAtAReportedOffsetResumesAtThatLine() = runBlocking {
         val records = listOf(Samples.header, Samples.ecg, Samples.settings.copy(value = "µV ±"), Samples.hr, Samples.acc, Samples.end)
         val file = newFile().apply { writeText(records.joinToString("") { line(it) }) }
-        val all = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
+        val all = withTimeout(timeoutMs.milliseconds) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
 
         for (startIndex in 1 until all.size) {
-            val resumed = withTimeout(timeoutMs) {
+            val resumed = withTimeout(timeoutMs.milliseconds) {
                 RawTail(file, pollIntervalMs = 5).linesWithOffsets(RawTail.Start.At(all[startIndex].offset)).toList()
             }
             assertEquals("from line $startIndex", all.drop(startIndex), resumed)
@@ -212,9 +213,9 @@ class RawTailTest {
     fun anOffsetInsideALineMovesOnToTheNextLine() = runBlocking {
         val records = listOf(Samples.header, Samples.ecg, Samples.hr, Samples.end)
         val file = newFile().apply { writeText(records.joinToString("") { line(it) }) }
-        val all = withTimeout(timeoutMs) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
+        val all = withTimeout(timeoutMs.milliseconds) { RawTail(file, pollIntervalMs = 5).linesWithOffsets().toList() }
 
-        val resumed = withTimeout(timeoutMs) {
+        val resumed = withTimeout(timeoutMs.milliseconds) {
             RawTail(file, pollIntervalMs = 5).linesWithOffsets(RawTail.Start.At(all[1].offset + 3)).toList()
         }
         assertEquals(all.drop(2), resumed)

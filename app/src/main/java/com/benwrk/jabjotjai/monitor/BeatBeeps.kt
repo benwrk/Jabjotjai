@@ -2,6 +2,7 @@ package com.benwrk.jabjotjai.monitor
 
 import android.os.SystemClock
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /** A beat noticed later than this after its time is passed over rather than sounded late. */
 private const val LATE_BEEP_NS = 150_000_000L
@@ -38,7 +39,7 @@ suspend fun beepAtBeats(beats: () -> List<Long>, gain: () -> Float) {
             } else {
                 ((next - SystemClock.elapsedRealtimeNanos()) / 1_000_000).coerceIn(1, MAX_SLEEP_MS)
             }
-            delay(sleepMs)
+            delay(sleepMs.milliseconds)
         }
     }
 }

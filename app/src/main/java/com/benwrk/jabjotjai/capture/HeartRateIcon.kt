@@ -1,7 +1,6 @@
 package com.benwrk.jabjotjai.capture
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PorterDuff
@@ -10,6 +9,7 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.Icon
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
 import com.benwrk.jabjotjai.R
 import kotlin.math.roundToInt
 
@@ -33,7 +33,7 @@ object HeartRateIcon {
     fun create(context: Context, bpm: Int): Icon {
         val sizePx = (SIZE_DP * context.resources.displayMetrics.density).roundToInt()
         val unit = sizePx / 24f
-        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(sizePx, sizePx)
         val canvas = Canvas(bitmap)
         requireNotNull(ContextCompat.getDrawable(context, R.drawable.ic_heart)).apply {
             setBounds(0, 0, sizePx, sizePx)

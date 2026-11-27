@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The one bar above the full-width waveforms, standing in for the system status bar the monitor
@@ -167,7 +168,7 @@ private fun PhoneStatus() {
         while (true) {
             value = readPhoneStatus(context, clock)
             // Just after the next second starts, so the seconds change when the phone's clock does.
-            delay(1_000L - System.currentTimeMillis() % 1_000L)
+            delay((1_000L - System.currentTimeMillis() % 1_000L).milliseconds)
         }
     }
     Column {

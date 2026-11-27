@@ -37,10 +37,8 @@ class RawWriter private constructor(
     }
 
     override fun close() {
-        try {
+        out.use {
             if (unsynced) syncNow()
-        } finally {
-            out.close()
         }
     }
 
