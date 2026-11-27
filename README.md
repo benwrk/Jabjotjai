@@ -1,8 +1,8 @@
 # Jabjotjai
 
-**Holter-style ECG recorder for the Polar H10.**
+**A Holter-style recorder for a chest-strap ECG sensor.**
 
-Android 13+ · Polar H10 chest strap · No account · No internet access · Version 0.4.0, prerelease
+Android 13+ · No account · No internet access · Version 0.4.0, prerelease
 
 **[Download 0.4.0](https://github.com/benwrk/Jabjotjai/releases/tag/v0.4.0)**
 
@@ -18,15 +18,16 @@ Android 13+ · Polar H10 chest strap · No account · No internet access · Vers
   </tr>
   <tr>
     <td><img src="docs/screenshots/chart-rows.png" alt="The display settings: choosing what each chart row shows" width="400"></td>
-    <td><img src="docs/screenshots/strap-picker.png" alt="Picking a Polar H10 from a scan of nearby straps" width="400"></td>
+    <td><img src="docs/screenshots/strap-picker.png" alt="Picking the strap from a scan of nearby straps" width="400"></td>
   </tr>
 </table>
 
 ## About this app
 
-Jabjotjai turns a Polar H10 chest strap into a Holter-style recorder. It captures everything the
+Jabjotjai is a Holter-style recorder for a chest-strap ECG sensor. It captures everything the
 strap sends, ECG, beat-to-beat (RR) intervals, heart rate and motion, continuously, through
-exercise, sleep and everything in between, and keeps it, as received, on your phone.
+exercise, sleep and everything in between, and keeps it, as received, on your phone. It works with
+the Polar H10.
 
 **Watch it live, like a bedside monitor**
 
@@ -122,6 +123,9 @@ your recordings.
 
 What each version does is in [`docs/spec.md`](docs/spec.md).
 
+Jabjotjai is not affiliated with, endorsed by or sponsored by Polar Electro Oy. Polar and Polar
+product names are trademarks of Polar Electro Oy.
+
 ---
 
 ## Building from source
@@ -173,3 +177,9 @@ reuse: copying, modifying or redistributing it needs written permission. You may
 the APKs published on the Releases page on your own devices, for your own use. The software is
 provided as is, without warranty or guarantee, and is not a medical device. The full terms are in
 [`LICENSE`](LICENSE).
+
+The app includes third-party software, including Polar's SDK, each under its own licence. They are
+listed, with their licence texts, in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), which is
+also attached to every release. The list is generated from the build's dependencies by
+[`scripts/third-party-notices.sh`](scripts/third-party-notices.sh), and CI fails if it falls out of
+date.
