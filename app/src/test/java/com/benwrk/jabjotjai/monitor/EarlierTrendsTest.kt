@@ -153,6 +153,25 @@ class EarlierTrendsTest {
     }
 
     @Test
+    fun afterARestartAnEarlierFilesTrendsAndPlacesAreMovedOntoTheCurrentClock() {
+        // As in the restart above: the earlier file's times move by -1095 s.
+        val a = header("a", wallMs = 1_000_000, monoNs = 100 * s)
+        val file = write(a, EventRecord(0, 100 * s + 1, RawEvents.CONNECTED), hr(101 * s, 61), hr(103 * s, 63))
+        val b = header("b", wallMs = 2_000_000, monoNs = 5 * s, continues = "a")
+        val shift = -1095 * s
+        val model = MonitorModel()
+        val mapped = readEarlierTrends(model, folder.root, b).read.single()
+
+        val trend = model.snapshot().heartRateTrend
+        assertEquals(listOf(101 * s + shift, 103 * s + shift, 103 * s + shift), trend.tNs.take(trend.size))
+        assertEquals(100 * s + shift, mapped.startNs)
+        assertEquals(103 * s + shift, mapped.endNs)
+        val offsetOf103 = file.readLines().take(3).sumOf { it.length + 1 }.toLong()
+        assertEquals(offsetOf103, mapped.timeline.markAtOrBefore(103 * s + shift)?.offset)
+        assertEquals(RawEvents.CONNECTED, mapped.timeline.stateAt(102 * s + shift).connection)
+    }
+
+    @Test
     fun aLinesTimeIsReadFromItsMonoField() {
         assertEquals(42L, monoNsOf("{\"type\":\"ecg\",\"wall_ms\":1,\"mono_ns\":42,\"t_ns\":[]}"))
         assertNull(monoNsOf("{\"type\":\"gap\",\"from_mono_ns\":5}"))

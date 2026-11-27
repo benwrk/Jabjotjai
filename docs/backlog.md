@@ -120,13 +120,10 @@ spec changed to say what happens instead.
 ## Prove on the phone that 0.6 places an earlier file correctly after a restart
 
 `docs/spec.md` 0.6 item 2 moves an earlier file's times onto the current file's clock when the
-phone restarted between them (`clockShiftNs`). It has not been seen on the phone, and the unit
-tests would not catch it breaking: every `readEarlierTrends` test uses files whose shift is zero,
-so removing the shift from the timeline or from `acceptEarlier` fails nothing; only the
-arithmetic of `clockShiftNs` and the shifting in `earlierLines` are tested. Done when a test
-reads an earlier file across a restart and fails without the shift, and a capture resumed after
-restarting the phone has been seen with the earlier file's trend and timeline in the right place,
-with the date.
+phone restarted between them (`clockShiftNs`). A unit test reads an earlier file across a
+restart and fails without the shift, but it has not been seen on the phone. Done when a capture
+resumed after restarting the phone has been seen with the earlier file's trend and timeline in
+the right place, with the date.
 
 ## Decide whether the capture notification shows icons
 
