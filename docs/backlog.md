@@ -291,8 +291,9 @@ Done when each is fixed or shown not to happen.
 - On the README's portrait screenshot the gesture handle crosses the elapsed time below the
   timeline, although the screen pads for the system bars; mechanism unconfirmed.
 - The Stop question, the display sheet and the speed menu open windows of their own, and
-  Material 3's sheet keeps the system bars visible for its window, so the status bar may come back
-  while one is open (not tried).
+  Material 3's sheet keeps the system bars visible for its window. With the display sheet open
+  the status bar came back and the monitor behind it moved down (seen 2026-11-28, Material 3
+  1.5); the Stop question and the speed menu are not yet tried.
 
 Done when the app is dark from launch whatever the phone's setting, and the bottom insets and
 each of those windows have been checked on the test phone.
@@ -512,6 +513,8 @@ template tests are gone.
 - Template leftovers: `Theme.kt`'s purple schemes and dynamic colour, which colour the Stop
   dialog's button and the sheet's chips; `colors.xml`, unused; `backup_rules.xml`, which applies
   only up to Android 11; the unused string `monitor_battery_optimised`.
+- Calls Material 3 1.5 deprecates: `rememberModalBottomSheetState` in `DisplaySheet` and the
+  `ListItem` taking `headlineContent` in `DevicePickerScreen`; both still work.
 - Names: `raf`, `prefs`, `dir`, `mid` (`AGENTS.md`: whole words).
 - `docs/raw-format.md` does not list the values of `end.reason` (`user_stop`, `error`,
   `service_destroyed`); `ExitReasons.NAMES` maps exit reasons by position rather than by
