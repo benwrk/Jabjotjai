@@ -54,11 +54,19 @@ because uninstalling deletes them.
 - **Heart-rate and RR trends**: rows that plot the values the strap reported across 1 to 60
   minutes, sweeping like the waveforms or scrolling with the newest value at the edge. They reach
   back through a recording that resumed, with the time in between shown as a break.
+- **Stray values do not flatten the trends**: the heart-rate and RR rows scale to the middle 98%
+  of their values, leave out or dim values the strap sent without skin contact, and keep RR
+  intervals beyond a limit you choose off the scale. A value left off the scale is marked at its
+  edge, and the recording keeps every value.
+- **Read the value under your finger**: hold a finger on a heart-rate or RR row to see the value
+  there and the time it was received.
 - **An optional beep at each beat**, with its own volume, in the foreground or in the background
   too.
 - **Nothing is hidden by the display**: a peak that runs off the edge of its row is drawn on the
   edge and marked as clipped.
-- **Landscape or portrait**, filling the screen either way.
+- **Landscape or portrait**, filling the screen either way, and under the camera too if you
+  choose, with the labels kept clear of it.
+- **Back to the defaults in one tap**: every display setting can be restored, after asking.
 
 **Rewind the recording while it is still running**
 
@@ -76,7 +84,7 @@ because uninstalling deletes them.
   by itself. If the app is stopped any other way, it offers to resume the recording the next time
   it is opened, and the time in between is kept as a gap.
 - **Warns you about battery optimisation**, which can end an overnight recording, while it is
-  switched on.
+  switched on, and a tap on the warning asks Android to let the app run unrestricted.
 
 **Honest data**
 
@@ -93,12 +101,15 @@ because uninstalling deletes them.
 
 ## What's new
 
-- **Trends and rewinding across a resumed recording**: when a recording resumes after an update
-  or a stop, the heart-rate and RR rows and the timeline reach back through the earlier part too,
-  with the time in between shown as a break.
-- **Heart-rate and RR rows**, plotting the strap's values across 1 to 60 minutes.
-- **Rows with their own speeds**: a row can be a separate graph at its own sweep speed, so the
-  same ECG can be shown fast and slow at once.
+- **Stray values no longer flatten the heart-rate and RR rows**: the scale ignores the few values
+  furthest out, values sent without skin contact and RR intervals beyond a limit, and marks them
+  at the edge instead. Each is a setting, on by default.
+- **Read the value under your finger** on a heart-rate or RR row.
+- **The chart can reach under the camera**, an option in the display settings.
+- **A shortcut out of battery optimisation**: tap the amber battery icon.
+- **Restore the display settings to their defaults**. A fresh install now starts with two
+  cascaded ECG rows above heart-rate and RR rows.
+- **One font throughout**: every screen now uses the monitor's monospaced font.
 
 Each release's notes, generated from its changes, are on the
 [Releases](https://github.com/benwrk/Jabjotjai/releases) page.
@@ -138,7 +149,8 @@ your recordings.
 
 - **No list of past recordings, no viewer and no export.** Recordings are kept in the app's private
   storage, and nothing can get them off the phone yet.
-- **No guided setup** for exempting the app from battery management.
+- **No guided setup beyond Android's own battery optimisation.** Battery management a phone's
+  maker adds on top of it is not covered.
 - **No beat detection of its own.** The flash and the beep follow the beats the strap reports.
 
 What each version does is in [`docs/spec.md`](docs/spec.md).
