@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -157,7 +158,11 @@ private fun ThinSlider(
         enabled = enabled,
         colors = colors,
         thumb = {
-            Box(Modifier.size(if (active) dot + 4.dp else dot).background(if (enabled) MonitorColors.Text else Color.Transparent, CircleShape))
+            // The slider gives the thumb its full height and draws it from the top, while the line
+            // is centred; filling that height and centring the dot puts the dot on the line.
+            Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(if (active) dot + 4.dp else dot).background(if (enabled) MonitorColors.Text else Color.Transparent, CircleShape))
+            }
         },
         track = { state ->
             SliderDefaults.Track(
