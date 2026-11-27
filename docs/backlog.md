@@ -28,6 +28,19 @@ Done when:
 
 Until then, build and install only from the machine that installed the current build.
 
+## Prove a capture survives 30 minutes on battery with the screen off
+
+`docs/spec.md` 0.1 item 4, staying connected in the background, is the one 0.1 requirement not
+yet seen working. Seen so far on the test phone (2026-11-27): 59 minutes with the screen on and
+the phone charging, and about 3 minutes locked on battery, both with no gaps; Doze never went
+past `INACTIVE`, and it does not start while the phone charges.
+
+Done when a capture has run for at least 30 minutes with the phone unplugged, still, and its
+screen off, with battery optimisation left at its default, and the raw file shows no gaps and
+the usual ECG and accelerometer rates; record the deepest state `dumpsys deviceidle` reached and
+the date. If the capture drops, exempt the app from battery optimisation and run it again: the
+difference is what the battery-management walkthrough below has to ask for.
+
 ## Walk the user through exempting the app from battery management
 
 `AGENTS.md` ("Capture") requires it: vendor battery management can end a recording silently, so
