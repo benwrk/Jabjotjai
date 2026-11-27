@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.SystemClock
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -264,7 +265,14 @@ class CaptureService : Service() {
         val model = MonitorModel(keepNs = 0)
         // The heart-rate and RR history of the files this capture continues, before its own (0.6).
         try {
-            withContext(Dispatchers.IO) { RawTail.readHeader(file)?.let { readEarlierTrends(model, file.parentFile ?: return@let, it) } }
+            val startedNs = SystemClock.elapsedRealtimeNanos()
+            val read = withContext(Dispatchers.IO) {
+                RawTail.readHeader(file)?.let { header -> file.parentFile?.let { readEarlierTrends(model, it, header) } }
+            }
+            if (read != null && read.files > 0) {
+                val ms = (SystemClock.elapsedRealtimeNanos() - startedNs) / 1_000_000
+                Log.i(TAG, "read the trends of ${read.files} earlier files, ${read.bytes / 1_000_000} MB, in $ms ms")
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

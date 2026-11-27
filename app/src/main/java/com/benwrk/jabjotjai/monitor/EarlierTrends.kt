@@ -51,8 +51,12 @@ private const val MAX_EARLIER_FILES = 200
  * decoded; a line's type is told from its start, so the waveform lines that make up most of a file
  * cost only their reading.
  */
-fun readEarlierTrends(model: MonitorModel, dir: File, current: HeaderRecord) {
-    for ((file, header) in earlierCaptures(dir, current)) {
+/** How much [readEarlierTrends] read: [files] files of [bytes] in all. */
+data class EarlierTrendsRead(val files: Int, val bytes: Long)
+
+fun readEarlierTrends(model: MonitorModel, dir: File, current: HeaderRecord): EarlierTrendsRead {
+    val earlier = earlierCaptures(dir, current)
+    for ((file, header) in earlier) {
         val shift = clockShiftNs(header, current)
         var last = header.start.monoNs
         file.bufferedReader().useLines { lines ->
@@ -67,6 +71,7 @@ fun readEarlierTrends(model: MonitorModel, dir: File, current: HeaderRecord) {
         }
         model.endEarlier(last + shift)
     }
+    return EarlierTrendsRead(earlier.size, earlier.sumOf { it.first.length() })
 }
 
 private const val HR_LINE = "{\"type\":\"hr\""
